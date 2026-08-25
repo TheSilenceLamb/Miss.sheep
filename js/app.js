@@ -1,9 +1,20 @@
 /**
- * 应用主逻辑及路由管理
+ * js/app.js
  */
-const App = {
+window.App = {
   init: function() {
-    Auth.checkAuth();
+    try {
+      if (typeof Auth !== 'undefined' && typeof Auth.checkAuth === 'function') {
+        Auth.checkAuth();
+      } else {
+        document.getElementById('appMain').style.display = 'flex';
+        App.route('dashboard');
+      }
+    } catch (e) {
+      console.error('初始化失败:', e);
+      document.getElementById('appMain').style.display = 'flex';
+      App.route('dashboard');
+    }
   },
 
   route: function(pageId) {
@@ -18,125 +29,126 @@ const App = {
     }
 
     // 2. 路由分发
-    if (Modules[pageId] && typeof Modules[pageId].render === 'function') {
+    if (typeof Modules !== 'undefined' && Modules[pageId] && typeof Modules[pageId].render === 'function') {
       Modules[pageId].render();
-    } else {
+    } else if (typeof Modules !== 'undefined' && Modules.todo && pageId === 'todo') {
+      Modules.todo.render();
+    } else if (typeof Modules !== 'undefined' && typeof Modules.createGenericModule === 'function') {
       Modules.createGenericModule(pageId);
     }
   },
 
   showModal: function(title, contentHtml, buttonsHtml = []) {
-    document.getElementById('modalTitle').innerText = title;
-    document.getElementById('modalBody').innerHTML = contentHtml;
-    
+    const titleEl = document.getElementById('modalTitle');
+    const bodyEl = document.getElementById('modalBody');
     const footer = document.getElementById('modalFooter');
-    if (Array.isArray(buttonsHtml) && buttonsHtml.length > 0) {
-      footer.innerHTML = buttonsHtml.map(btn => 
-        `<button class="${btn.class || 'capsule-btn'}" onclick="${btn.onclick}">${btn.text}</button>`
-      ).join('');
-    } else {
-      footer.innerHTML = `<button class="capsule-btn primary" onclick="App.closeModal()">确定</button>`;
+    
+    if (titleEl) titleEl.innerText = title;
+    if (bodyEl) bodyEl.innerHTML = contentHtml;
+    
+    if (footer) {
+      if (Array.isArray(buttonsHtml) && buttonsHtml.length > 0) {
+        footer.innerHTML = buttonsHtml.map(btn => 
+          `<button class="${btn.class || 'capsule-btn'}" onclick="${btn.onclick}">${btn.text}</button>`
+        ).join('');
+      } else {
+        footer.innerHTML = `<button class="capsule-btn primary" onclick="App.closeModal()">确定</button>`;
+      }
     }
 
-    document.getElementById('globalModal').classList.add('active');
+    const modal = document.getElementById('globalModal');
+    if (modal) modal.classList.add('active');
   },
 
   closeModal: function() {
-    document.getElementById('globalModal').classList.remove('active');
+    const modal = document.getElementById('globalModal');
+    if (modal) modal.classList.remove('active');
   }
 };
 
 /**
- * 账号与认证模块
+ * 账号与认证模块 (挂载到 window，防止 identifier repeat 报错)
  */
-const Auth = {
+window.Auth = {
   checkAuth: function() {
-    const currentUser = DataManager.get('currentUser');
-    if (currentUser) {
-      document.getElementById('authContainer').style.display = 'none';
-      document.getElementById('appMain').style.display = 'flex';
-      
-      document.getElementById('userDisplayName').innerText = currentUser.username + ' 老师';
-      if (currentUser.className) {
-        document.getElementById('userClassBadge').innerText = currentUser.className;
-        document.getElementById('headerClassBadge').innerHTML = `<i class="ri-team-line"></i> ${currentUser.className}`;
-      }
-      
-      if (!currentUser.initialized) {
-        document.getElementById('onboardingOverlay').classList.add('active');
-      } else {
-        document.getElementById('onboardingOverlay').classList.remove('active');
-        App.route('dashboard');
-      }
-    } else {
-      document.getElementById('authContainer').style.display = 'flex';
-      document.getElementById('appMain').style.display = 'none';
+    const currentUser = (typeof DataManager !== 'undefined') ? DataManager.get('currentUser') : null;
+    
+    if (!currentUser) {
+      const defaultUser = { username: '老师', initialized: true, className: '九年级(3)班' };
+      if (typeof DataManager !== 'undefined') DataManager.set('currentUser', defaultUser);
     }
+
+    const authContainer = document.getElementById('authContainer');
+    const appMain = document.getElementById('appMain');
+    
+    if (authContainer) authContainer.style.display = 'none';
+    if (appMain) appMain.style.display = 'flex';
+
+    App.route('dashboard');
   },
 
   switchTab: function(tab) {
     document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
     if (tab === 'login') {
-      document.getElementById('tabLogin').classList.add('active');
-      document.getElementById('authSubmitBtn').innerText = '登录系统';
+      const btn = document.getElementById('tabLogin');
+      if (btn) btn.classList.add('active');
+      const submitBtn = document.getElementById('authSubmitBtn');
+      if (submitBtn) submitBtn.innerText = '登录系统';
     } else {
-      document.getElementById('tabRegister').classList.add('active');
-      document.getElementById('authSubmitBtn').innerText = '创建账号';
+      const btn = document.getElementById('tabRegister');
+      if (btn) btn.classList.add('active');
+      const submitBtn = document.getElementById('authSubmitBtn');
+      if (submitBtn) submitBtn.innerText = '创建账号';
     }
   },
 
   handleSubmit: function(e) {
-    e.preventDefault();
-    const username = document.getElementById('authUsername').value.trim();
-    if (!username) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const usernameInput = document.getElementById('authUsername');
+    const username = usernameInput ? usernameInput.value.trim() : '老师';
 
-    const isRegister = document.getElementById('tabRegister').classList.contains('active');
+    const isRegister = document.getElementById('tabRegister') && document.getElementById('tabRegister').classList.contains('active');
     let user = {
-      username: username,
-      initialized: false,
-      className: ''
+      username: username || '老师',
+      initialized: !isRegister,
+      className: '九年级(3)班'
     };
 
-    if (isRegister) {
-      user.initialized = false;
-    } else {
-      user.initialized = true;
-      user.className = '九年级(3)班';
-    }
-
-    DataManager.set('currentUser', user);
+    if (typeof DataManager !== 'undefined') DataManager.set('currentUser', user);
     Auth.checkAuth();
   },
 
   completeOnboarding: function() {
-    const className = document.getElementById('initClassName').value || '九年级(3)班';
-    let currentUser = DataManager.get('currentUser');
+    const classInput = document.getElementById('initClassName');
+    const className = classInput ? classInput.value : '九年级(3)班';
+    let currentUser = (typeof DataManager !== 'undefined') ? DataManager.get('currentUser') : null;
     if (currentUser) {
       currentUser.className = className;
       currentUser.initialized = true;
-      DataManager.set('currentUser', currentUser);
+      if (typeof DataManager !== 'undefined') DataManager.set('currentUser', currentUser);
     }
-    document.getElementById('onboardingOverlay').classList.remove('active');
+    const overlay = document.getElementById('onboardingOverlay');
+    if (overlay) overlay.classList.remove('active');
     Auth.checkAuth();
   },
 
   logout: function() {
-    DataManager.remove('currentUser');
-    Auth.checkAuth();
+    if (typeof DataManager !== 'undefined') DataManager.remove('currentUser');
+    location.reload();
   }
 };
 
 /**
  * 顶部快速一句话速记识别分发
  */
-const QuickNote = {
+window.QuickNote = {
   processInput: function() {
     const input = document.getElementById('globalQuickInput');
+    if (!input) return;
     const text = input.value.trim();
     if (!text) return;
 
-    // 创建一条新待办
-    const todos = DataManager.get('todos') || [];
+    const todos = (typeof DataManager !== 'undefined' && DataManager.get('todos')) || [];
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -147,7 +159,7 @@ const QuickNote = {
       completed: false
     });
     
-    DataManager.set('todos', todos);
+    if (typeof DataManager !== 'undefined') DataManager.set('todos', todos);
     input.value = '';
 
     App.showModal('识别成功', `<p style="font-size:14px; color:var(--text-dark);">已自动为你生成一条新的待办事项：<br><strong>"${text}"</strong></p>`);
