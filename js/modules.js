@@ -3,6 +3,28 @@
  */
 const Modules = {};
 
+// 莫兰迪马卡龙配色库
+const MacaronColors = [
+  { bg: '#fce4ec', border: '#f8bbd0', text: '#880e4f' }, // 柔粉
+  { bg: '#e3f2fd', border: '#bbdefb', text: '#0d47a1' }, // 柔蓝
+  { bg: '#e8f5e9', border: '#c8e6c9', text: '#1b5e20' }, // 柔绿
+  { bg: '#fff3e0', border: '#ffe0b2', text: '#e65100' }, // 柔橙
+  { bg: '#f3e5f5', border: '#e1bee7', text: '#4a148c' }, // 柔紫
+  { bg: '#e0f7fa', border: '#b2ebf2', text: '#006064' }, // 柔青
+  { bg: '#fffde7', border: '#fff9c4', text: '#f57f17' }  // 柔黄
+];
+
+// 根据学科名称哈希生成确定色彩
+function getSubjectColor(subjectName) {
+  if (!subjectName) return MacaronColors[0];
+  let hash = 0;
+  for (let i = 0; i < subjectName.length; i++) {
+    hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % MacaronColors.length;
+  return MacaronColors[index];
+}
+
 // 1. 工作台首页
 Modules.dashboard = {
   title: '工作台首页',
@@ -12,9 +34,15 @@ Modules.dashboard = {
     const comms = DataStore.get('communication');
     const students = DataStore.get('students');
     const dutyGroups = DataStore.get('dutyGroups');
+    const schedule = DataStore.get('schedule');
     
     const user = Auth.getCurrentUser();
     const userInfo = Auth.getUsers()[user] || {};
+
+    // 动态判断今日课程数量（按当前星期）
+    const dayOfWeek = new Date().getDay(); // 0 是周日, 1-6 是周一至周六
+    const currentDayStr = dayOfWeek === 0 ? '7' : String(dayOfWeek);
+    const todayCourses = schedule.filter(c => String(c.day) === currentDayStr);
 
     const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
     const todayDuty = dutyGroups.length > 0 ? dutyGroups[dayOfYear % dutyGroups.length] : { name: '未分配', members: [] };
@@ -51,7 +79,7 @@ Modules.dashboard = {
         </div>
         <div class="card" onclick="App.route('schedule')" style="cursor:pointer;">
           <div style="color:var(--text-muted); font-size:13px;">今日课程</div>
-          <div style="font-size:24px; font-weight:700; margin-top:4px;">5 节</div>
+          <div style="font-size:24px; font-weight:700; margin-top:4px;">${todayCourses.length} 节</div>
         </div>
         <div class="card" onclick="App.route('duty')" style="cursor:pointer;">
           <div style="color:var(--text-muted); font-size:13px;">今日值日</div>
@@ -92,7 +120,233 @@ Modules.dashboard = {
   }
 };
 
-// 2. 学生管理（包含模版下载与全格式 Excel/CSV 文件解析导入）
+// 2. 课程表模块 (支持一周七天、图例、莫兰迪卡片、点击详情弹窗、新增与批量Excel导入)
+Modules.schedule = {
+  title: '课程表',
+  render() {
+    const schedule = DataStore.get('schedule');
+    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const maxPeriods = 8; // 默认每日8节课
+
+    // 提取所有出现的学科用于上方标注图例
+    const subjects = [...new Set(schedule.map(s => s.subject))];
+
+    return `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3>每周课程安排 (一周七天)</h3>
+          <div style="display:flex; gap:8px;">
+            <button class="capsule-btn secondary" onclick="Modules.schedule.downloadTemplate()"><i class="ri-download-line"></i> 下载课表模版</button>
+            <button class="capsule-btn primary" onclick="document.getElementById('scheduleExcelInput').click()"><i class="ri-file-excel-line"></i> 批量导入课表 (.xlsx/.csv)</button>
+            <button class="capsule-btn primary" onclick="Modules.schedule.addCourseModal()"><i class="ri-add-line"></i> 添加课程</button>
+          </div>
+        </div>
+
+        <!-- 学科颜色图例标注栏 -->
+        ${subjects.length > 0 ? `
+          <div class="legend-bar">
+            <span style="font-size:12px; color:var(--text-muted); font-weight:600;">学科标注图例：</span>
+            ${subjects.map(sub => {
+              const style = getSubjectColor(sub);
+              return `
+                <div class="legend-item">
+                  <div class="legend-color" style="background:${style.bg}; border:1px solid ${style.border}"></div>
+                  <span>${sub}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+
+        <!-- 周七天课程网格 -->
+        <div class="schedule-table-wrapper">
+          <div class="schedule-grid">
+            <div class="schedule-header">节次 / 时间</div>
+            ${days.map(d => `<div class="schedule-header">${d}</div>`).join('')}
+
+            ${Array.from({ length: maxPeriods }).map((_, pIdx) => {
+              const period = pIdx + 1;
+              return `
+                <div class="schedule-slot-title">第 ${period} 节</div>
+                ${Array.from({ length: 7 }).map((_, dIdx) => {
+                  const day = dIdx + 1;
+                  const item = schedule.find(s => Number(s.day) === day && Number(s.period) === period);
+                  if (item) {
+                    const colorStyle = getSubjectColor(item.subject);
+                    return `
+                      <div class="schedule-cell">
+                        <div class="course-card" 
+                          style="background:${colorStyle.bg}; border:1px solid ${colorStyle.border}; color:${colorStyle.text};"
+                          onclick="Modules.schedule.showCourseDetail('${item.id}')">
+                          <div class="c-name">${item.subject}</div>
+                          <div class="c-teacher">${item.teacher || '未知老师'}</div>
+                        </div>
+                      </div>
+                    `;
+                  } else {
+                    return `<div class="schedule-cell" onclick="Modules.schedule.addCourseModal(${day}, ${period})"></div>`;
+                  }
+                }).join('')}
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  downloadTemplate() {
+    const templateData = [
+      { "星期(1-7)": 1, "节次(1-8)": 1, "学科": "语文", "科任老师": "张老师", "上课地点": "本班教室" },
+      { "星期(1-7)": 1, "节次(1-8)": 2, "学科": "数学", "科任老师": "李老师", "上课地点": "本班教室" },
+      { "星期(1-7)": 2, "节次(1-8)": 1, "学科": "英语", "科任老师": "王老师", "上课地点": "本班教室" }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "课程表模版");
+    XLSX.writeFile(wb, "班级课程表导入模版.xlsx");
+  },
+
+  handleExcelImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      try {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonRows = XLSX.utils.sheet_to_json(firstSheet);
+
+        if (!jsonRows || jsonRows.length === 0) {
+          App.showToast('未解析到课程数据');
+          return;
+        }
+
+        const schedule = DataStore.get('schedule');
+        let count = 0;
+
+        jsonRows.forEach((row, idx) => {
+          const day = row['星期(1-7)'] || row['星期'] || row['Day'];
+          const period = row['节次(1-8)'] || row['节次'] || row['Period'];
+          const subject = row['学科'] || row['课程'] || row['Subject'];
+
+          if (day && period && subject) {
+            // 覆盖重复时段
+            const filtered = schedule.filter(s => !(s.day == day && s.period == period));
+            filtered.push({
+              id: 'crs_' + Date.now() + '_' + idx,
+              day: Number(day),
+              period: Number(period),
+              subject: String(subject).trim(),
+              teacher: row['科任老师'] || row['教师'] || '未填',
+              location: row['上课地点'] || row['教室'] || '本班教室'
+            });
+            schedule.length = 0;
+            schedule.push(...filtered);
+            count++;
+          }
+        });
+
+        DataStore.set('schedule', schedule);
+        App.showToast(`成功导入 ${count} 节课程！`);
+        App.route('schedule');
+      } catch (err) {
+        console.error(err);
+        App.showToast('解析课程文件失败');
+      }
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  },
+
+  addCourseModal(defaultDay = 1, defaultPeriod = 1) {
+    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="form-group">
+          <label>选择星期</label>
+          <select id="crs_day" class="ui-select">
+            ${days.map((d, i) => `<option value="${i + 1}" ${defaultDay === i + 1 ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>选择节次</label>
+          <select id="crs_period" class="ui-select">
+            ${Array.from({ length: 8 }).map((_, i) => `<option value="${i + 1}" ${defaultPeriod === i + 1 ? 'selected' : ''}>第 ${i + 1} 节</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>学科名称</label>
+          <input type="text" id="crs_subject" class="ui-input" placeholder="例如：语文、数学、物理">
+        </div>
+        <div class="form-group">
+          <label>科任老师</label>
+          <input type="text" id="crs_teacher" class="ui-input" placeholder="例如：张老师">
+        </div>
+        <div class="form-group">
+          <label>上课地点</label>
+          <input type="text" id="crs_location" class="ui-input" placeholder="例如：本班教室 / 实验室" value="本班教室">
+        </div>
+      </div>
+    `;
+    App.showModal('手动添加/配置课程', bodyHtml, `<button class="capsule-btn primary" onclick="Modules.schedule.saveCourse()">保存课程</button>`);
+  },
+
+  saveCourse() {
+    const day = Number(document.getElementById('crs_day').value);
+    const period = Number(document.getElementById('crs_period').value);
+    const subject = document.getElementById('crs_subject').value.trim();
+    const teacher = document.getElementById('crs_teacher').value.trim() || '未指定老师';
+    const location = document.getElementById('crs_location').value.trim() || '本班教室';
+
+    if (!subject) {
+      App.showToast('请输入学科名称');
+      return;
+    }
+
+    let schedule = DataStore.get('schedule');
+    schedule = schedule.filter(s => !(s.day === day && s.period === period));
+    schedule.push({ id: 'crs_' + Date.now(), day, period, subject, teacher, location });
+    
+    DataStore.set('schedule', schedule);
+    App.closeModal();
+    App.showToast('课程已成功更新！');
+    App.route('schedule');
+  },
+
+  showCourseDetail(courseId) {
+    const schedule = DataStore.get('schedule');
+    const item = schedule.find(s => s.id === courseId);
+    if (!item) return;
+
+    const days = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const bodyHtml = `
+      <div style="padding:8px 0;">
+        <div style="font-size:18px; font-weight:700; color:var(--primary-color); margin-bottom:12px;">${item.subject}</div>
+        <p style="margin-bottom:8px;"><strong>时间：</strong>${days[item.day]} 第 ${item.period} 节</p>
+        <p style="margin-bottom:8px;"><strong>科任老师：</strong>${item.teacher || '未指定'}</p>
+        <p style="margin-bottom:8px;"><strong>上课地点：</strong>${item.location || '本班教室'}</p>
+      </div>
+    `;
+
+    App.showModal('课程详细信息', bodyHtml, `
+      <button class="capsule-btn secondary" style="color:#ef4444;" onclick="Modules.schedule.deleteCourse('${item.id}')">删除此课</button>
+    `);
+  },
+
+  deleteCourse(courseId) {
+    let schedule = DataStore.get('schedule');
+    schedule = schedule.filter(s => s.id !== courseId);
+    DataStore.set('schedule', schedule);
+    App.closeModal();
+    App.showToast('已从课表中移除该课程');
+    App.route('schedule');
+  }
+};
+
+// 3. 学生管理
 Modules.students = {
   title: '学生管理',
   render() {
@@ -267,7 +521,7 @@ Modules.students = {
   }
 };
 
-// 3. 座次表
+// 4. 座次表
 Modules.seating = {
   title: '座次表',
   render() {
@@ -326,7 +580,7 @@ Modules.seating = {
   }
 };
 
-// 4. 班级相册 (IndexedDB)
+// 5. 班级相册
 Modules.album = {
   title: '班级相册',
   render() {
@@ -390,7 +644,7 @@ Modules.album = {
   }
 };
 
-// 5. 成绩管理
+// 6. 成绩管理
 Modules.scores = {
   title: '成绩管理',
   render() {
@@ -430,7 +684,6 @@ const createGenericModule = (title, icon, text) => ({
   }
 });
 
-Modules.schedule = createGenericModule('课程表', 'ri-calendar-event-line', '支持晚自习与周末上课的课程管理。');
 Modules.duty = createGenericModule('值日轮值表', 'ri-sparkles-line', '智能自动轮换，按日期周期自动对齐首页今日值日卡片。');
 Modules.logs = createGenericModule('班级日志', 'ri-book-open-line', '记录日常、会议、突发事件。支持一句话速记自动归档。');
 Modules.communication = createGenericModule('家校沟通', 'ri-chat-heart-line', '家校联动与逾期提醒，自动关联学生档案。');
