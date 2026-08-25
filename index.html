@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>初中班主任减负工作台</title>
+  <!-- Chart.js CDN 用于数据图表 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Remixicon CDN 用于图标 -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 左侧导航栏 -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon"><i class="ri-heart-pulse-fill"></i></div>
+        <div class="brand-text">
+          <h2>减负工作台</h2>
+          <span>班主任智囊小助手</span>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <a class="nav-item active" onclick="App.route('dashboard')" id="nav-dashboard"><i class="ri-dashboard-3-line"></i> 工作台首页</a>
+        <a class="nav-item" onclick="App.route('students')" id="nav-students"><i class="ri-user-smile-line"></i> 学生管理</a>
+        <a class="nav-item" onclick="App.route('schedule')" id="nav-schedule"><i class="ri-calendar-event-line"></i> 课程表</a>
+        <a class="nav-item" onclick="App.route('seating')" id="nav-seating"><i class="ri-layout-grid-line"></i> 座次表</a>
+        <a class="nav-item" onclick="App.route('duty')" id="nav-duty"><i class="ri-sparkles-line"></i> 值日轮值表</a>
+        <a class="nav-item" onclick="App.route('scores')" id="nav-scores"><i class="ri-bar-chart-grouped-line"></i> 成绩管理</a>
+        <a class="nav-item" onclick="App.route('logs')" id="nav-logs"><i class="ri-book-open-line"></i> 班级日志</a>
+        <a class="nav-item" onclick="App.route('communication')" id="nav-communication"><i class="ri-chat-heart-line"></i> 家校沟通</a>
+        <a class="nav-item" onclick="App.route('homework')" id="nav-homework"><i class="ri-task-line"></i> 作业管理</a>
+        <a class="nav-item" onclick="App.route('classroom')" id="nav-classroom"><i class="ri-presentation-line"></i> 课堂记录</a>
+        <a class="nav-item" onclick="App.route('album')" id="nav-album"><i class="ri-image-2-line"></i> 班级相册</a>
+        <a class="nav-item" onclick="App.route('tools')" id="nav-tools"><i class="ri-briefcase-line"></i> 减负工具箱</a>
+      </nav>
+    </aside>
+
+    <!-- 主主体布局 -->
+    <main class="main-content">
+      <!-- 顶栏 -->
+      <header class="topbar">
+        <div class="quick-input-container">
+          <i class="ri-magic-line magic-icon"></i>
+          <input type="text" id="globalQuickInput" placeholder="一句话速记（例如：张伟今天数学课表现很好，提醒家长注意按时完成作业）回车智能关联多个模块..." onkeypress="if(event.key==='Enter') QuickNote.processInput()">
+          <button class="capsule-btn primary" onclick="QuickNote.processInput()"><i class="ri-send-plane-fill"></i> 识别并分发</button>
+        </div>
+        <div class="topbar-right">
+          <div class="class-badge"><i class="ri-team-line"></i> 九年级(3)班</div>
+          <div class="date-badge" id="currentDateBadge">2026年8月25日 星期二</div>
+        </div>
+      </header>
+
+      <!-- 动态路由渲染区域 -->
+      <section id="pageContent" class="page-content">
+        <!-- 模块内容由 JavaScript 渲染 -->
+      </section>
+    </main>
+  </div>
+
+  <!-- 全局 Modal 模态框容器 -->
+  <div class="modal-overlay" id="globalModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">提示</h3>
+        <button class="icon-btn" onclick="App.closeModal()"><i class="ri-close-line"></i></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- 脚本引用 -->
+  <script src="js/data.js"></script>
+  <script src="js/modules.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
