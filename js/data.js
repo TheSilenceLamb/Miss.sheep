@@ -2,7 +2,6 @@
  * DataStore, Auth & PhotoStore 封装
  */
 
-// 1. PhotoStore (IndexedDB 包装)
 const PhotoStore = {
   dbName: 'ClassroomDB',
   storeName: 'photos',
@@ -57,7 +56,6 @@ const PhotoStore = {
   }
 };
 
-// 2. Auth 系统与多账户数据隔离管理
 const Auth = {
   getCurrentUser() {
     return localStorage.getItem('app_current_user');
@@ -114,10 +112,7 @@ const Auth = {
       }
     }
 
-    // 设置当前登录用户
     localStorage.setItem('app_current_user', user);
-    
-    // 初始化数据并检查是否需要设置班级
     DataStore.initUserData(user);
     App.checkAuthAndRender();
   },
@@ -136,7 +131,7 @@ const Auth = {
     }
 
     document.getElementById('onboardingOverlay').classList.remove('active');
-    App.showToast('设置完成！初始平台为空，可在学生管理中批量导入人员。');
+    App.showToast('设置完成！平台初始为空，可在各模块自由添加。');
     App.checkAuthAndRender();
   },
 
@@ -147,7 +142,6 @@ const Auth = {
   }
 };
 
-// 3. DataStore (针对当前登录用户的多隔离 Key 机制)
 const DataStore = {
   getKey(key) {
     const currentUser = Auth.getCurrentUser() || 'guest';
@@ -163,11 +157,11 @@ const DataStore = {
     localStorage.setItem(this.getKey(key), JSON.stringify(value));
   },
 
-  // 账号空数据初始化
   initUserData(username) {
     const initKey = `app_${username}_initialized`;
     if (!localStorage.getItem(initKey)) {
       this.set('students', []);
+      this.set('schedule', []); // 初始课表为空数组
       this.set('dutyGroups', []);
       this.set('todos', []);
       this.set('communication', []);
@@ -179,7 +173,6 @@ const DataStore = {
   }
 };
 
-// 4. NLP 一句话智能识别分发引擎
 const QuickNote = {
   processInput() {
     const inputEl = document.getElementById('globalQuickInput');
