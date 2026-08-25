@@ -8,10 +8,64 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Remixicon CDN 用于图标 -->
   <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <!-- SheetJS 用于浏览器端直接解析 Excel/CSV 文件 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="app-container">
+  <!-- 登录 / 注册 独立界面 -->
+  <div id="authContainer" class="auth-container" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="brand-icon"><i class="ri-heart-pulse-fill"></i></div>
+        <h2>班主任减负工作台</h2>
+        <p>纯前端个人独立工作台 · 数据安全本地存储</p>
+      </div>
+      <div class="auth-tabs">
+        <button id="tabLogin" class="auth-tab active" onclick="Auth.switchTab('login')">登录账号</button>
+        <button id="tabRegister" class="auth-tab" onclick="Auth.switchTab('register')">注册新账号</button>
+      </div>
+      <form id="authForm" onsubmit="Auth.handleSubmit(event)">
+        <div class="form-group">
+          <label><i class="ri-user-line"></i> 账号 / 教师姓名</label>
+          <input type="text" id="authUsername" placeholder="请输入教师账号" required>
+        </div>
+        <div class="form-group">
+          <label><i class="ri-lock-password-line"></i> 密码</label>
+          <input type="password" id="authPassword" placeholder="请输入密码" required>
+        </div>
+        <button type="submit" id="authSubmitBtn" class="capsule-btn primary block">登录系统</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 新用户首次初始化设置弹窗/遮罩 -->
+  <div id="onboardingOverlay" class="modal-overlay" style="z-index: 200;">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>🎉 欢迎使用！请完成初始化设置</h3>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">
+          设置您的基本班级信息，提交后平台将准备就绪（初始无学生数据）。
+        </p>
+        <div class="form-group">
+          <label>班级名称</label>
+          <input type="text" id="initClassName" placeholder="例如：九年级(3)班" value="九年级(3)班" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border-light);">
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label>任教学科</label>
+          <input type="text" id="initSubject" placeholder="例如：数学" value="数学" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border-light);">
+        </div>
+      </div>
+      <div class="modal-footer" style="margin-top:20px;">
+        <button class="capsule-btn primary block" onclick="Auth.completeOnboarding()">进入工作台</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主工作台容器 -->
+  <div class="app-container" id="appMain" style="display: none;">
     <!-- 左侧导航栏 -->
     <aside class="sidebar">
       <div class="brand">
@@ -35,6 +89,14 @@
         <a class="nav-item" onclick="App.route('album')" id="nav-album"><i class="ri-image-2-line"></i> 班级相册</a>
         <a class="nav-item" onclick="App.route('tools')" id="nav-tools"><i class="ri-briefcase-line"></i> 减负工具箱</a>
       </nav>
+      <!-- 底部用户信息与退出登录按钮 -->
+      <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div id="userDisplayName" style="font-weight: 600; font-size: 14px;">老师</div>
+          <div id="userClassBadge" style="font-size: 11px; color: var(--text-muted);">班级未设定</div>
+        </div>
+        <button class="icon-btn" onclick="Auth.logout()" title="退出登录" style="color: #ef4444;"><i class="ri-logout-box-r-line"></i></button>
+      </div>
     </aside>
 
     <!-- 主主体布局 -->
@@ -43,11 +105,11 @@
       <header class="topbar">
         <div class="quick-input-container">
           <i class="ri-magic-line magic-icon"></i>
-          <input type="text" id="globalQuickInput" placeholder="一句话速记（例如：张伟今天数学课表现很好，提醒家长注意按时完成作业）回车智能关联多个模块..." onkeypress="if(event.key==='Enter') QuickNote.processInput()">
+          <input type="text" id="globalQuickInput" placeholder="一句话速记（例如：张伟今天数学课表现很好）回车智能关联多个模块..." onkeypress="if(event.key==='Enter') QuickNote.processInput()">
           <button class="capsule-btn primary" onclick="QuickNote.processInput()"><i class="ri-send-plane-fill"></i> 识别并分发</button>
         </div>
         <div class="topbar-right">
-          <div class="class-badge"><i class="ri-team-line"></i> 九年级(3)班</div>
+          <div class="class-badge" id="headerClassBadge"><i class="ri-team-line"></i> 未设定班级</div>
           <div class="date-badge" id="currentDateBadge">2026年8月25日 星期二</div>
         </div>
       </header>
@@ -70,6 +132,9 @@
       <div class="modal-footer" id="modalFooter"></div>
     </div>
   </div>
+
+  <!-- 隐藏的文件上传控件（用于解析 Excel / CSV 导入学生） -->
+  <input type="file" id="studentExcelInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="Modules.students.handleExcelImport(event)">
 
   <!-- 脚本引用 -->
   <script src="js/data.js"></script>
