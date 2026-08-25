@@ -125,30 +125,8 @@ Modules.schedule = {
   title: '课程表',
   render() {
     const schedule = DataStore.get('schedule');
+    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     const maxPeriods = 8; // 默认每日8节课
-
-    // =================【新增：计算本周周一到周日的具体日期】=================
-    const now = new Date();
-    const currentDayOfWeek = now.getDay(); // 0(周日) ~ 6(周六)
-    // 计算当前日期距离本周一相差的天数 (JS 中 0 代表周日)
-    const distanceToMonday = (currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek);
-    
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + distanceToMonday);
-
-    // 生成周一至周日的日期数组与表头名称
-    const weekNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const daysHeader = weekNames.map((name, index) => {
-      const targetDate = new Date(monday);
-      targetDate.setDate(monday.getDate() + index);
-      
-      const year = targetDate.getFullYear();
-      const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-      const day = String(targetDate.getDate()).padStart(2, '0');
-      
-      return `${name} (${year}.${month}.${day})`;
-    });
-    // =====================================================================
 
     // 提取所有出现的学科用于上方标注图例
     const subjects = [...new Set(schedule.map(s => s.subject))];
@@ -184,13 +162,12 @@ Modules.schedule = {
         <div class="schedule-table-wrapper">
           <div class="schedule-grid">
             <div class="schedule-header">节次 / 时间</div>
-            
-            <!-- 使用计算好的带日期的表头 -->
-            ${daysHeader.map(d => `<div class="schedule-header">${d}</div>`).join('')}
+            ${days.map(d => `<div class="schedule-header">${d}</div>`).join('')}
 
             ${Array.from({ length: maxPeriods }).map((_, pIdx) => {
               const period = pIdx + 1;
               
+              // 1. 渲染当前节次的 8 个单元格（1个节次标题 + 7天单元格）
               const rowHtml = `
                 <div class="schedule-slot-title">第 ${period} 节</div>
                 ${Array.from({ length: 7 }).map((_, dIdx) => {
@@ -214,7 +191,7 @@ Modules.schedule = {
                 }).join('')}
               `;
 
-              // 上下午分隔线（第 4 节后插入）
+              // 2. 如果是第 4 节（上午最后一节），在其后面追加一行午休水平分割线
               const dividerHtml = (period === 4) ? `
                 <div class="schedule-noon-divider">
                   <span>☀️ 上午 (1-4节) &nbsp; | &nbsp; 🍱 午休时间 &nbsp; | &nbsp; 🌙 下午 (5-8节)</span>
@@ -228,8 +205,6 @@ Modules.schedule = {
       </div>
     `;
   },
-  
-  // 其余 downloadTemplate / handleExcelImport / addCourseModal 等方法保持原样...
 
   downloadTemplate() {
     const templateData = [
