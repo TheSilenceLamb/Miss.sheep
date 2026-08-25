@@ -107,3 +107,22 @@ body { background-color: var(--bg-main); color: var(--text-dark); min-height: 10
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
 .modal-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 28px; width: 90%; max-width: 520px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+
+/* 课程表上下午分割线样式 */
+.schedule-noon-divider {
+  grid-column: 1 / -1; /* 贯穿所有 Grid 网格列 */
+  background-color: #f1f5f9;
+  border-top: 2px dashed #cbd5e1;
+  border-bottom: 2px dashed #cbd5e1;
+  padding: 8px 0;
+  margin: 6px 0;
+  text-align: center;
+  border-radius: 6px;
+}
+
+.schedule-noon-divider span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 1px;
+}
