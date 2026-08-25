@@ -206,6 +206,8 @@ Modules.schedule = {
     `;
   },
 
+  // 后续 downloadTemplate, handleExcelImport, addCourseModal 等方法完全保持不变...
+
   downloadTemplate() {
     const templateData = [
       { "星期(1-7)": 1, "节次(1-8)": 1, "学科": "语文", "科任老师": "张老师", "上课地点": "本班教室" },
