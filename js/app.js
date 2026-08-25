@@ -1,24 +1,89 @@
 /**
- * js/app.js
+ * js/app.js - 主应用控制器及辅助函数
  */
 window.App = {
+  currentRoute: 'dashboard',
+
   init: function() {
     try {
-      if (typeof Auth !== 'undefined' && typeof Auth.checkAuth === 'function') {
-        Auth.checkAuth();
+      // 初始化 PhotoStore
+      PhotoStore.init().catch(e => console.warn('PhotoStore 初始化失败:', e));
+      
+      // 检查用户登录状态
+      if (Auth.getCurrentUser()) {
+        App.checkAuthAndRender();
       } else {
-        document.getElementById('appMain').style.display = 'flex';
-        App.route('dashboard');
+        App.showAuthUI();
       }
     } catch (e) {
-      console.error('初始化失败:', e);
-      document.getElementById('appMain').style.display = 'flex';
-      App.route('dashboard');
+      console.error('应用初始化失败:', e);
+      App.showAuthUI();
     }
   },
 
+  showAuthUI: function() {
+    const authContainer = document.getElementById('authContainer');
+    const appMain = document.getElementById('appMain');
+    if (authContainer) authContainer.style.display = 'flex';
+    if (appMain) appMain.style.display = 'none';
+  },
+
+  checkAuthAndRender: function() {
+    const currentUser = Auth.getCurrentUser();
+    if (!currentUser) {
+      App.showAuthUI();
+      return;
+    }
+
+    const authContainer = document.getElementById('authContainer');
+    const appMain = document.getElementById('appMain');
+    
+    if (authContainer) authContainer.style.display = 'none';
+    if (appMain) appMain.style.display = 'flex';
+
+    // 更新用户界面信息
+    App.updateUserDisplay();
+    
+    // 检查是否需要初始化
+    const users = Auth.getUsers();
+    if (users[currentUser] && !users[currentUser].isOnboarded) {
+      const overlay = document.getElementById('onboardingOverlay');
+      if (overlay) overlay.classList.add('active');
+    } else {
+      const overlay = document.getElementById('onboardingOverlay');
+      if (overlay) overlay.classList.remove('active');
+    }
+
+    // 导航到首页
+    App.route('dashboard');
+  },
+
+  updateUserDisplay: function() {
+    const currentUser = Auth.getCurrentUser();
+    const users = Auth.getUsers();
+    const userData = users[currentUser] || {};
+    
+    const userDisplay = document.getElementById('userDisplayName');
+    const userBadge = document.getElementById('userClassBadge');
+    const headerBadge = document.getElementById('headerClassBadge');
+
+    if (userDisplay) userDisplay.innerText = currentUser;
+    if (userBadge) userBadge.innerText = userData.className || '班级未设定';
+    if (headerBadge) headerBadge.innerHTML = `<i class="ri-team-line"></i> ${userData.className || '班级未设定'}`;
+  },
+
+  updateDateDisplay: function() {
+    const now = new Date();
+    const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+    const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${weekDays[now.getDay()]}`;
+    const badge = document.getElementById('currentDateBadge');
+    if (badge) badge.innerText = dateStr;
+  },
+
   route: function(pageId) {
-    // 1. 高亮切换导航，严格保留手写 <i> 图标节点，只切换 active 类
+    App.currentRoute = pageId;
+    
+    // 1. 高亮切换导航
     document.querySelectorAll('.nav-menu .nav-item').forEach(item => {
       item.classList.remove('active');
     });
@@ -31,8 +96,6 @@ window.App = {
     // 2. 路由分发
     if (typeof Modules !== 'undefined' && Modules[pageId] && typeof Modules[pageId].render === 'function') {
       Modules[pageId].render();
-    } else if (typeof Modules !== 'undefined' && Modules.todo && pageId === 'todo') {
-      Modules.todo.render();
     } else if (typeof Modules !== 'undefined' && typeof Modules.createGenericModule === 'function') {
       Modules.createGenericModule(pageId);
     }
@@ -63,116 +126,33 @@ window.App = {
   closeModal: function() {
     const modal = document.getElementById('globalModal');
     if (modal) modal.classList.remove('active');
+  },
+
+  showToast: function(message) {
+    // 简单的 toast 实现
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--text-dark);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 50px;
+      font-size: 13px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    `;
+    toast.innerText = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
   }
 };
 
-/**
- * 账号与认证模块 (挂载到 window，防止 identifier repeat 报错)
- */
-window.Auth = {
-  checkAuth: function() {
-    const currentUser = (typeof DataManager !== 'undefined') ? DataManager.get('currentUser') : null;
-    
-    if (!currentUser) {
-      const defaultUser = { username: '老师', initialized: true, className: '九年级(3)班' };
-      if (typeof DataManager !== 'undefined') DataManager.set('currentUser', defaultUser);
-    }
-
-    const authContainer = document.getElementById('authContainer');
-    const appMain = document.getElementById('appMain');
-    
-    if (authContainer) authContainer.style.display = 'none';
-    if (appMain) appMain.style.display = 'flex';
-
-    App.route('dashboard');
-  },
-
-  switchTab: function(tab) {
-    document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
-    if (tab === 'login') {
-      const btn = document.getElementById('tabLogin');
-      if (btn) btn.classList.add('active');
-      const submitBtn = document.getElementById('authSubmitBtn');
-      if (submitBtn) submitBtn.innerText = '登录系统';
-    } else {
-      const btn = document.getElementById('tabRegister');
-      if (btn) btn.classList.add('active');
-      const submitBtn = document.getElementById('authSubmitBtn');
-      if (submitBtn) submitBtn.innerText = '创建账号';
-    }
-  },
-
-  handleSubmit: function(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    const usernameInput = document.getElementById('authUsername');
-    const username = usernameInput ? usernameInput.value.trim() : '老师';
-
-    const isRegister = document.getElementById('tabRegister') && document.getElementById('tabRegister').classList.contains('active');
-    let user = {
-      username: username || '老师',
-      initialized: !isRegister,
-      className: '九年级(3)班'
-    };
-
-    if (typeof DataManager !== 'undefined') DataManager.set('currentUser', user);
-    Auth.checkAuth();
-  },
-
-  completeOnboarding: function() {
-    const classInput = document.getElementById('initClassName');
-    const className = classInput ? classInput.value : '九年级(3)班';
-    let currentUser = (typeof DataManager !== 'undefined') ? DataManager.get('currentUser') : null;
-    if (currentUser) {
-      currentUser.className = className;
-      currentUser.initialized = true;
-      if (typeof DataManager !== 'undefined') DataManager.set('currentUser', currentUser);
-    }
-    const overlay = document.getElementById('onboardingOverlay');
-    if (overlay) overlay.classList.remove('active');
-    Auth.checkAuth();
-  },
-
-  logout: function() {
-    if (typeof DataManager !== 'undefined') DataManager.remove('currentUser');
-    location.reload();
-  }
-};
-
-/**
- * 顶部快速一句话速记识别分发
- */
-window.QuickNote = {
-  processInput: function() {
-    const input = document.getElementById('globalQuickInput');
-    if (!input) return;
-    const text = input.value.trim();
-    if (!text) return;
-
-    const todos = (typeof DataManager !== 'undefined' && DataManager.get('todos')) || [];
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    todos.unshift({
-      id: Date.now(),
-      title: text,
-      createdAt: dateStr,
-      completed: false
-    });
-    
-    if (typeof DataManager !== 'undefined') DataManager.set('todos', todos);
-    input.value = '';
-
-    App.showModal('识别成功', `<p style="font-size:14px; color:var(--text-dark);">已自动为你生成一条新的待办事项：<br><strong>"${text}"</strong></p>`);
-
-    const activeNav = document.querySelector('.nav-item.active');
-    if (activeNav && activeNav.id === 'nav-dashboard') {
-      Modules.dashboard.render();
-    } else if (activeNav && activeNav.id === 'nav-todo') {
-      Modules.todo.render();
-    }
-  }
-};
-
+// 初始化事件监听
 document.addEventListener('DOMContentLoaded', () => {
+  App.updateDateDisplay();
+  // 每分钟更新一次日期显示
+  setInterval(() => App.updateDateDisplay(), 60000);
   App.init();
 });

@@ -1,28 +1,28 @@
 /**
- * 各业务功能模块页面渲染及交互处理
+ * js/modules.js - 各业务功能模块页面渲染及交互处理
  */
 const Modules = {
   // 1. 首页 Dashboard 模块
   dashboard: {
     render: function() {
       const container = document.getElementById('pageContent');
-      const todos = DataManager.get('todos') || [];
+      const todos = DataStore.get('todos') || [];
       
-      // 过滤出未完成事项（已完成的不显示在首页）
-      const pendingTodos = todos.filter(t => !t.completed);
+      // 过滤出未完成事项
+      const pendingTodos = todos.filter(t => !t.done);
 
-      let todoItemsHtml = pendingTodos.map(todo => `
-        <div class="todo-item" style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-light); background: #fff; border-radius:8px; margin-bottom:8px; transition:all 0.2s;">
+      let todoItemsHtml = pendingTodos.slice(0, 5).map(todo => `
+        <div class="todo-item" style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-light); background: #fff; border-radius:8px; margin-bottom:8px;">
           <div style="flex:1; cursor:pointer;" onclick="App.route('todo')">
             <div style="font-weight:500; font-size:14px; color:var(--text-dark);">${todo.title}</div>
             <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-              <i class="ri-time-line"></i> 设立时间：${todo.createdAt || '未设定时间'}
+              <i class="ri-time-line"></i> 设立时间：${todo.date || '未设定时间'}
             </div>
           </div>
           <input type="checkbox" 
                  style="width:18px; height:18px; cursor:pointer; accent-color:var(--primary-color);" 
-                 onclick="event.stopPropagation(); Modules.todo.toggleComplete(${todo.id})" 
-                 title="勾选即标记完成，首页不再显示">
+                 onclick="event.stopPropagation(); Modules.todo.toggleComplete('${todo.id}')" 
+                 title="勾选即标记完成">
         </div>
       `).join('');
 
@@ -32,20 +32,20 @@ const Modules = {
 
       container.innerHTML = `
         <div class="dashboard-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
-          <!-- 待办事项卡片：点击卡片头部跳转侧边栏 -->
+          <!-- 待办事项卡片 -->
           <div class="card todo-card">
             <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="App.route('todo')">
               <h3 style="margin:0; font-size:16px; display:flex; align-items:center; gap:6px;">
                 <i class="ri-checkbox-multiple-line" style="color:var(--primary-color);"></i> 待办事项
               </h3>
-              <span style="font-size:12px; color:var(--primary-color); font-weight:500;">详情/历史 (${todos.length}) &gt;</span>
+              <span style="font-size:12px; color:var(--primary-color); font-weight:500;">详情 (${todos.length}) &gt;</span>
             </div>
             <div class="card-body" style="padding: 12px 16px;">
               ${todoItemsHtml}
             </div>
           </div>
 
-          <!-- 快捷入口示例卡片 -->
+          <!-- 快捷入口卡片 -->
           <div class="card">
             <div class="card-header">
               <h3 style="margin:0; font-size:16px;"><i class="ri-rocket-line"></i> 快捷工作台</h3>
@@ -62,14 +62,14 @@ const Modules = {
     }
   },
 
-  // 2. 侧边栏独立【待办事项】详细模块
+  // 2. 待办事项详细模块
   todo: {
     render: function() {
       const container = document.getElementById('pageContent');
-      const todos = DataManager.get('todos') || [];
+      const todos = DataStore.get('todos') || [];
 
-      const pendingList = todos.filter(t => !t.completed);
-      const completedList = todos.filter(t => t.completed);
+      const pendingList = todos.filter(t => !t.done);
+      const completedList = todos.filter(t => t.done);
 
       container.innerHTML = `
         <div class="module-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -92,12 +92,12 @@ const Modules = {
                     <div>
                       <div style="font-weight:600; font-size:14px; color:var(--text-dark);">${item.title}</div>
                       <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
-                        <i class="ri-time-line"></i> 设立时间：${item.createdAt}
+                        <i class="ri-time-line"></i> 设立时间：${item.date}
                       </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:12px;">
-                      <input type="checkbox" style="width:18px; height:18px; cursor:pointer;" onchange="Modules.todo.toggleComplete(${item.id})" title="标记为完成">
-                      <button class="icon-btn" onclick="Modules.todo.deleteTodo(${item.id})" style="color:#ef4444;" title="删除"><i class="ri-delete-bin-line"></i></button>
+                      <input type="checkbox" style="width:18px; height:18px; cursor:pointer;" onchange="Modules.todo.toggleComplete('${item.id}')" title="标记为完成">
+                      <button class="icon-btn" onclick="Modules.todo.deleteTodo('${item.id}')" style="color:#ef4444;" title="删除"><i class="ri-delete-bin-line"></i></button>
                     </div>
                   </div>
                 `).join('')
@@ -113,16 +113,16 @@ const Modules = {
             <div class="card-body" style="padding:12px;">
               ${completedList.length === 0 ? '<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:20px;">暂无已完成记录</p>' : 
                 completedList.map(item => `
-                  <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid #f0f0f0; background:#fafafa; border-radius:6px; margin-bottom:8px; opacity:0.85;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid #f0f0f0; background:#fafafa; border-radius:6px; margin-bottom:8px;">
                     <div>
                       <div style="text-decoration:line-through; font-size:14px; color:var(--text-muted);">${item.title}</div>
                       <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
-                        <i class="ri-calendar-check-line"></i> 设立时间：${item.createdAt}
+                        <i class="ri-calendar-check-line"></i> 设立时间：${item.date}
                       </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:12px;">
-                      <input type="checkbox" checked style="width:18px; height:18px; cursor:pointer;" onchange="Modules.todo.toggleComplete(${item.id})" title="取消完成">
-                      <button class="icon-btn" onclick="Modules.todo.deleteTodo(${item.id})" style="color:#ef4444;" title="删除"><i class="ri-delete-bin-line"></i></button>
+                      <input type="checkbox" checked style="width:18px; height:18px; cursor:pointer;" onchange="Modules.todo.toggleComplete('${item.id}')" title="取消完成">
+                      <button class="icon-btn" onclick="Modules.todo.deleteTodo('${item.id}')" style="color:#ef4444;" title="删除"><i class="ri-delete-bin-line"></i></button>
                     </div>
                   </div>
                 `).join('')
@@ -134,21 +134,15 @@ const Modules = {
     },
 
     toggleComplete: function(id) {
-      let todos = DataManager.get('todos') || [];
+      let todos = DataStore.get('todos') || [];
       todos = todos.map(t => {
         if (t.id === id) {
-          t.completed = !t.completed;
+          t.done = !t.done;
         }
         return t;
       });
-      DataManager.set('todos', todos);
-      
-      const activeNav = document.querySelector('.nav-item.active');
-      if (activeNav && activeNav.id === 'nav-dashboard') {
-        Modules.dashboard.render();
-      } else {
-        Modules.todo.render();
-      }
+      DataStore.set('todos', todos);
+      Modules.todo.render();
     },
 
     showAddModal: function() {
@@ -168,27 +162,28 @@ const Modules = {
       const input = document.getElementById('newTodoTitle');
       if (!input || !input.value.trim()) return;
 
-      const todos = DataManager.get('todos') || [];
-      const now = new Date();
-      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const todos = DataStore.get('todos') || [];
+      const today = new Date().toISOString().split('T')[0];
 
       todos.unshift({
-        id: Date.now(),
+        id: 't_' + Date.now(),
         title: input.value.trim(),
-        createdAt: dateStr,
-        completed: false
+        date: today,
+        done: false
       });
 
-      DataManager.set('todos', todos);
+      DataStore.set('todos', todos);
       App.closeModal();
       Modules.todo.render();
+      App.showToast('待办事项已添加');
     },
 
     deleteTodo: function(id) {
-      let todos = DataManager.get('todos') || [];
+      let todos = DataStore.get('todos') || [];
       todos = todos.filter(t => t.id !== id);
-      DataManager.set('todos', todos);
+      DataStore.set('todos', todos);
       Modules.todo.render();
+      App.showToast('待办事项已删除');
     }
   },
 
@@ -214,6 +209,7 @@ const Modules = {
       <div class="card" style="padding:24px;">
         <h2>${title}</h2>
         <p style="color:var(--text-muted); margin-top:10px;">该功能模块已就绪，正在准备展示界面...</p>
+        <p style="color:var(--text-muted); font-size:13px; margin-top:16px;">💡 后续版本将逐步补全各模块功能。</p>
       </div>
     `;
   }
