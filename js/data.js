@@ -136,7 +136,7 @@ const Auth = {
     }
 
     document.getElementById('onboardingOverlay').classList.remove('active');
-    App.showToast('设置完成！初始化平台为空，请在学生管理中导入人员数据。');
+    App.showToast('设置完成！初始平台为空，可在学生管理中批量导入人员。');
     App.checkAuthAndRender();
   },
 
@@ -163,11 +163,10 @@ const DataStore = {
     localStorage.setItem(this.getKey(key), JSON.stringify(value));
   },
 
-  // 账号空初始化
+  // 账号空数据初始化
   initUserData(username) {
     const initKey = `app_${username}_initialized`;
     if (!localStorage.getItem(initKey)) {
-      // 默认为空平台数据结构
       this.set('students', []);
       this.set('dutyGroups', []);
       this.set('todos', []);
@@ -198,7 +197,7 @@ const QuickNote = {
     };
 
     const bodyHtml = `
-      <p style="margin-bottom:12px; color:var(--text-muted)">系统智能识别到以下归属模块，请勾选确认并一键保存：</p>
+      <p style="margin-bottom:12px; color:var(--text-muted); font-size:13px;">系统智能识别到以下归属模块，请勾选确认并一键保存：</p>
       <div style="background:#f8fafc; padding:12px; border-radius:12px; margin-bottom:16px;"><strong>识别文本：</strong>"${text}"</div>
       
       <div style="display:flex; flex-direction:column; gap:10px;">
