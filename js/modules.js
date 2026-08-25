@@ -25,6 +25,39 @@ function getSubjectColor(subjectName) {
   return MacaronColors[index];
 }
 
+// 异步获取下一个节假日数据（带本地 fallback 兜底）
+async function getNextHolidayData() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const currentYear = today.getFullYear();
+
+  try {
+    const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${currentYear}/CN`);
+    if (response.ok) {
+      const holidays = await response.json();
+      const upcoming = holidays.find(h => new Date(h.date) >= today);
+      if (upcoming) {
+        const holidayDate = new Date(upcoming.date);
+        const diffDays = Math.max(0, Math.ceil((holidayDate - today) / (1000 * 60 * 60 * 24)));
+        return { name: upcoming.localName, days: diffDays };
+      }
+    }
+  } catch (error) {
+    console.warn('节假日 API 请求失败，自动切换为本地兜底配置', error);
+  }
+
+  // 兜底数据配置
+  const fallbackHolidays = [
+    { name: '中秋/国庆节', date: `${currentYear}-10-01` },
+    { name: '元旦', date: `${currentYear + 1}-01-01` },
+    { name: '春节', date: `${currentYear + 1}-02-12` }
+  ];
+
+  const nextFallback = fallbackHolidays.find(h => new Date(h.date) >= today) || fallbackHolidays[0];
+  const diffDays = Math.max(0, Math.ceil((new Date(nextFallback.date) - today) / (1000 * 60 * 60 * 24)));
+  return { name: nextFallback.name, days: diffDays };
+}
+
 // 1. 工作台首页
 Modules.dashboard = {
   title: '工作台首页',
@@ -47,13 +80,16 @@ Modules.dashboard = {
     const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
     const todayDuty = dutyGroups.length > 0 ? dutyGroups[dayOfYear % dutyGroups.length] : { name: '未分配', members: [] };
 
-    const holidays = [
-      { name: '中秋/国庆节', date: '2026-10-01' },
-      { name: '元旦', date: '2027-01-01' }
-    ];
-    const today = new Date();
-    const nextHoliday = holidays[0];
-    const diffDays = Math.max(0, Math.ceil((new Date(nextHoliday.date) - today) / (1000 * 60 * 60 * 24)));
+    // 异步拉取最新节假日并异步更新页面 DOM
+    setTimeout(async () => {
+      const holidayInfo = await getNextHolidayData();
+      const titleEl = document.getElementById('dash_holiday_title');
+      const daysEl = document.getElementById('dash_holiday_days');
+      if (titleEl && daysEl) {
+        titleEl.innerText = `距离下一个节假日【${holidayInfo.name}】`;
+        daysEl.innerHTML = `${holidayInfo.days} <span style="font-size:16px;">天</span>`;
+      }
+    }, 0);
 
     return `
       <div class="grid-2">
@@ -65,8 +101,8 @@ Modules.dashboard = {
 
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <div style="font-size:12px; color:var(--text-muted)">距离下一个节假日【${nextHoliday.name}】</div>
-            <div style="font-size:32px; font-weight:800; color:var(--primary-color);">${diffDays} <span style="font-size:16px;">天</span></div>
+            <div id="dash_holiday_title" style="font-size:12px; color:var(--text-muted)">距离下一个节假日...</div>
+            <div id="dash_holiday_days" style="font-size:32px; font-weight:800; color:var(--primary-color);">-- <span style="font-size:16px;">天</span></div>
           </div>
           <i class="ri-plane-line" style="font-size:48px; color:var(--accent-mustard)"></i>
         </div>
@@ -127,10 +163,9 @@ Modules.schedule = {
     const schedule = DataStore.get('schedule');
     const maxPeriods = 8; // 默认每日8节课
 
-    // =================【新增：计算本周周一到周日的具体日期】=================
+    // 计算本周周一到周日的具体日期
     const now = new Date();
     const currentDayOfWeek = now.getDay(); // 0(周日) ~ 6(周六)
-    // 计算当前日期距离本周一相差的天数 (JS 中 0 代表周日)
     const distanceToMonday = (currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek);
     
     const monday = new Date(now);
@@ -148,7 +183,6 @@ Modules.schedule = {
       
       return `${name} (${year}.${month}.${day})`;
     });
-    // =====================================================================
 
     // 提取所有出现的学科用于上方标注图例
     const subjects = [...new Set(schedule.map(s => s.subject))];
@@ -267,7 +301,6 @@ Modules.schedule = {
           const subject = row['学科'] || row['课程'] || row['Subject'];
 
           if (day && period && subject) {
-            // 覆盖重复时段
             const filtered = schedule.filter(s => !(s.day == day && s.period == period));
             filtered.push({
               id: 'crs_' + Date.now() + '_' + idx,
