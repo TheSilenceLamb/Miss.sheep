@@ -1,5 +1,5 @@
 /**
- * DataStore & IndexedDB (PhotoStore) 封装与 Mock 初始化数据
+ * DataStore, Auth & PhotoStore 封装
  */
 
 // 1. PhotoStore (IndexedDB 包装)
@@ -57,65 +57,136 @@ const PhotoStore = {
   }
 };
 
-// 2. DataStore (LocalStorage 数据引擎)
+// 2. Auth 系统与多账户数据隔离管理
+const Auth = {
+  getCurrentUser() {
+    return localStorage.getItem('app_current_user');
+  },
+
+  getUsers() {
+    const u = localStorage.getItem('app_users');
+    return u ? JSON.parse(u) : {};
+  },
+
+  switchTab(type) {
+    const loginTab = document.getElementById('tabLogin');
+    const regTab = document.getElementById('tabRegister');
+    const submitBtn = document.getElementById('authSubmitBtn');
+    
+    if (type === 'login') {
+      loginTab.classList.add('active');
+      regTab.classList.remove('active');
+      submitBtn.innerText = '登录系统';
+      submitBtn.dataset.mode = 'login';
+    } else {
+      regTab.classList.add('active');
+      loginTab.classList.remove('active');
+      submitBtn.innerText = '注册新账号';
+      submitBtn.dataset.mode = 'register';
+    }
+  },
+
+  handleSubmit(e) {
+    e.preventDefault();
+    const mode = document.getElementById('authSubmitBtn').dataset.mode || 'login';
+    const user = document.getElementById('authUsername').value.trim();
+    const pass = document.getElementById('authPassword').value.trim();
+
+    if (!user || !pass) {
+      App.showToast('请输入账号和密码');
+      return;
+    }
+
+    const users = this.getUsers();
+
+    if (mode === 'register') {
+      if (users[user]) {
+        App.showToast('该账号已被注册');
+        return;
+      }
+      users[user] = { password: pass, className: '', subject: '', isOnboarded: false };
+      localStorage.setItem('app_users', JSON.stringify(users));
+      App.showToast('注册成功！正在为您自动登录');
+    } else {
+      if (!users[user] || users[user].password !== pass) {
+        App.showToast('账号或密码错误');
+        return;
+      }
+    }
+
+    // 设置当前登录用户
+    localStorage.setItem('app_current_user', user);
+    
+    // 初始化数据并检查是否需要设置班级
+    DataStore.initUserData(user);
+    App.checkAuthAndRender();
+  },
+
+  completeOnboarding() {
+    const user = this.getCurrentUser();
+    const className = document.getElementById('initClassName').value.trim() || '九年级(3)班';
+    const subject = document.getElementById('initSubject').value.trim() || '通用';
+
+    const users = this.getUsers();
+    if (users[user]) {
+      users[user].className = className;
+      users[user].subject = subject;
+      users[user].isOnboarded = true;
+      localStorage.setItem('app_users', JSON.stringify(users));
+    }
+
+    document.getElementById('onboardingOverlay').classList.remove('active');
+    App.showToast('设置完成！初始化平台为空，请在学生管理中导入人员数据。');
+    App.checkAuthAndRender();
+  },
+
+  logout() {
+    localStorage.removeItem('app_current_user');
+    App.checkAuthAndRender();
+    App.showToast('已安全退出账号');
+  }
+};
+
+// 3. DataStore (针对当前登录用户的多隔离 Key 机制)
 const DataStore = {
+  getKey(key) {
+    const currentUser = Auth.getCurrentUser() || 'guest';
+    return `app_${currentUser}_${key}`;
+  },
+
   get(key, defaultValue = []) {
-    const val = localStorage.getItem('app_' + key);
+    const val = localStorage.getItem(this.getKey(key));
     return val ? JSON.parse(val) : defaultValue;
   },
+
   set(key, value) {
-    localStorage.setItem('app_' + key, JSON.stringify(value));
+    localStorage.setItem(this.getKey(key), JSON.stringify(value));
   },
-  
-  // 智能 Mock 数据初始化
-  initMock() {
-    if (!localStorage.getItem('app_initialized')) {
-      this.set('students', [
-        { id: '1', name: '李明', gender: '男', parent: '李先生', phone: '13800000001', score: 92, notes: '讲纪律，数学思维突出' },
-        { id: '2', name: '张伟', gender: '男', parent: '张女士', phone: '13800000002', score: 78, notes: '近期作业偶有漏做' },
-        { id: '3', name: '王芳', gender: '女', parent: '王先生', phone: '13800000003', score: 95, notes: '语文课代表，表现优异' },
-        { id: '4', name: '赵强', gender: '男', parent: '赵女士', phone: '13800000004', score: 84, notes: '性格开朗，热爱体育活动' }
-      ]);
 
-      this.set('dutyGroups', [
-        { name: '第1组', members: ['李明', '王芳'], tasks: '扫地 + 擦黑板' },
-        { name: '第2组', members: ['张伟', '赵强'], tasks: '摆桌椅 + 倒垃圾' }
-      ]);
-
-      this.set('todos', [
-        { id: 't1', title: '收齐周记', done: false, date: '2026-08-25' },
-        { id: 't2', title: '准备周一主题班会 PPT', done: true, date: '2026-08-24' }
-      ]);
-
-      this.set('communication', [
-        { id: 'c1', student: '张伟', content: '沟通近期数学作业退步问题，家长表示回家加强督促', date: '2026-08-24', status: '已完成' }
-      ]);
-
-      this.set('logs', [
-        { id: 'l1', type: '日常', content: '全班出勤正常，无迟到现象。午休秩序良好。', date: '2026-08-25' }
-      ]);
-
-      this.set('scores', [
-        { studentId: '1', name: '李明', chinese: 88, math: 96, english: 92, physics: 90, history: 85 },
-        { studentId: '2', name: '张伟', chinese: 75, math: 68, english: 80, physics: 72, history: 78 },
-        { studentId: '3', name: '王芳', chinese: 96, math: 90, english: 98, physics: 88, history: 92 }
-      ]);
-
-      this.set('seating', { rows: 4, cols: 4, seats: ['李明', '张伟', '王芳', '赵强', '', '', '', ''] });
-
-      localStorage.setItem('app_initialized', 'true');
+  // 账号空初始化
+  initUserData(username) {
+    const initKey = `app_${username}_initialized`;
+    if (!localStorage.getItem(initKey)) {
+      // 默认为空平台数据结构
+      this.set('students', []);
+      this.set('dutyGroups', []);
+      this.set('todos', []);
+      this.set('communication', []);
+      this.set('logs', []);
+      this.set('scores', []);
+      this.set('seating', { rows: 4, cols: 5, seats: [] });
+      localStorage.setItem(initKey, 'true');
     }
   }
 };
 
-// 3. NLP 一句话智能识别分发引擎 (核心减负功能)
+// 4. NLP 一句话智能识别分发引擎
 const QuickNote = {
   processInput() {
     const inputEl = document.getElementById('globalQuickInput');
     const text = inputEl.value.trim();
     if (!text) return;
 
-    // 关键字分析
     const students = DataStore.get('students');
     const matchedStudent = students.find(s => text.includes(s.name));
 
@@ -126,7 +197,6 @@ const QuickNote = {
       studentNote: !!matchedStudent
     };
 
-    // 弹出确认卡片，允许一键关联勾选
     const bodyHtml = `
       <p style="margin-bottom:12px; color:var(--text-muted)">系统智能识别到以下归属模块，请勾选确认并一键保存：</p>
       <div style="background:#f8fafc; padding:12px; border-radius:12px; margin-bottom:16px;"><strong>识别文本：</strong>"${text}"</div>
@@ -171,7 +241,7 @@ const QuickNote = {
       const students = DataStore.get('students');
       const stu = students.find(s => s.id === studentId);
       if (stu) {
-        stu.notes += ` | [${today}] ${text}`;
+        stu.notes = (stu.notes || '') + ` | [${today}] ${text}`;
         DataStore.set('students', students);
       }
     }
@@ -179,6 +249,6 @@ const QuickNote = {
     document.getElementById('globalQuickInput').value = '';
     App.closeModal();
     App.showToast('智能分发成功！已同步至各模块');
-    App.route(App.currentRoute); // 刷新当前模块
+    App.route(App.currentRoute);
   }
 };
