@@ -92,7 +92,7 @@ Modules.dashboard = {
   }
 };
 
-// 2. 学生管理（含批量 Excel / CSV 导入与模版生成）
+// 2. 学生管理（包含模版下载与全格式 Excel/CSV 文件解析导入）
 Modules.students = {
   title: '学生管理',
   render() {
@@ -110,7 +110,7 @@ Modules.students = {
         ${students.length === 0 ? `
           <div style="text-align:center; padding:40px; border:2px dashed var(--border-light); border-radius:12px;">
             <i class="ri-user-add-line" style="font-size:40px; color:var(--text-muted)"></i>
-            <p style="margin-top:8px; color:var(--text-muted);">平台当前为空。点击上方【导入学生文件】上传 Excel / CSV 批量添加学生。</p>
+            <p style="margin-top:8px; color:var(--text-muted);">平台当前为空。点击上方【导入学生文件】直接导入 Excel / CSV 数据。</p>
           </div>
         ` : `
           <table style="width:100%; border-collapse:collapse; text-align:left;">
@@ -145,7 +145,6 @@ Modules.students = {
     `;
   },
 
-  // 自动下载导入模版 Excel
   downloadTemplate() {
     const templateData = [
       { "姓名": "张三", "性别": "男", "家长姓名": "张爸爸", "联系电话": "13800000001", "备注": "爱好篮球" },
@@ -157,7 +156,6 @@ Modules.students = {
     XLSX.writeFile(wb, "学生信息导入模板.xlsx");
   },
 
-  // 核心：使用 SheetJS 自动解析上传的 Excel / CSV 文件
   handleExcelImport(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -179,7 +177,6 @@ Modules.students = {
         let count = 0;
 
         jsonRows.forEach((row, idx) => {
-          // 支持字段智能匹配
           const name = row['姓名'] || row['Name'] || row['学生姓名'];
           if (name) {
             existingStudents.push({
@@ -202,7 +199,7 @@ Modules.students = {
         console.error(err);
         App.showToast('解析文件失败，请确保格式正确');
       }
-      e.target.value = ''; // 重置 input 触发下一次
+      e.target.value = '';
     };
     reader.readAsArrayBuffer(file);
   },
@@ -226,7 +223,7 @@ Modules.students = {
           datasets: [{
             label: '综合表现',
             data: [75, 80, 85, student.score || 80],
-            borderColor: '#ef8a8a',
+            borderColor: '#f4a261',
             tension: 0.3,
             fill: false
           }]
@@ -238,10 +235,10 @@ Modules.students = {
   addStudentModal() {
     const bodyHtml = `
       <div style="display:flex; flex-direction:column; gap:12px;">
-        <input type="text" id="new_stu_name" placeholder="学生姓名（必填）" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
-        <input type="text" id="new_stu_gender" placeholder="性别（如：男/女）" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
-        <input type="text" id="new_stu_parent" placeholder="家长姓名" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
-        <input type="text" id="new_stu_phone" placeholder="联系电话" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
+        <input type="text" id="new_stu_name" class="ui-input" placeholder="学生姓名（必填）">
+        <input type="text" id="new_stu_gender" class="ui-input" placeholder="性别（如：男/女）">
+        <input type="text" id="new_stu_parent" class="ui-input" placeholder="家长姓名">
+        <input type="text" id="new_stu_phone" class="ui-input" placeholder="联系电话">
       </div>
     `;
     App.showModal('新建学生档案', bodyHtml, `<button class="capsule-btn primary" onclick="Modules.students.saveStudent()">保存</button>`);
@@ -277,7 +274,6 @@ Modules.seating = {
     const seating = DataStore.get('seating');
     const students = DataStore.get('students');
     
-    // 如果没有生成过座次数组，根据已有学生数格式化
     if (!seating.seats || seating.seats.length === 0) {
       seating.seats = students.map(s => s.name);
       DataStore.set('seating', seating);
@@ -292,7 +288,7 @@ Modules.seating = {
           </div>
         </div>
         
-        <div style="width:200px; margin:16px auto 8px auto; text-align:center; background:#cbd5e1; padding:4px; border-radius:4px; font-size:12px;">讲台</div>
+        <div style="width:200px; margin:16px auto 8px auto; text-align:center; background:#e2e8f0; padding:4px; border-radius:4px; font-size:12px; color:var(--text-muted)">讲台</div>
 
         <div class="seat-grid" style="grid-template-columns: repeat(${seating.cols || 5}, 1fr);">
           ${seating.seats.map((seat, index) => `
@@ -414,7 +410,7 @@ Modules.scores = {
       type: 'bar',
       data: {
         labels: ['平均分'],
-        datasets: [{ label: '成绩', data: [85], backgroundColor: ['#ef8a8a'] }]
+        datasets: [{ label: '成绩', data: [85], backgroundColor: ['#f4a261'] }]
       },
       options: { responsive: true, maintainAspectRatio: false }
     });
