@@ -166,7 +166,9 @@ Modules.schedule = {
 
             ${Array.from({ length: maxPeriods }).map((_, pIdx) => {
               const period = pIdx + 1;
-              return `
+              
+              // 1. 渲染当前节次的 8 个单元格（1个节次标题 + 7天单元格）
+              const rowHtml = `
                 <div class="schedule-slot-title">第 ${period} 节</div>
                 ${Array.from({ length: 7 }).map((_, dIdx) => {
                   const day = dIdx + 1;
@@ -188,6 +190,15 @@ Modules.schedule = {
                   }
                 }).join('')}
               `;
+
+              // 2. 如果是第 4 节（上午最后一节），在其后面追加一行午休水平分割线
+              const dividerHtml = (period === 4) ? `
+                <div class="schedule-noon-divider">
+                  <span>☀️ 上午 (1-4节) &nbsp; | &nbsp; 🍱 午休时间 &nbsp; | &nbsp; 🌙 下午 (5-8节)</span>
+                </div>
+              ` : '';
+
+              return rowHtml + dividerHtml;
             }).join('')}
           </div>
         </div>
