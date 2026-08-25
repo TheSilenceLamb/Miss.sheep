@@ -3,7 +3,7 @@
  */
 const Modules = {};
 
-// 1. 工作台首页模块
+// 1. 工作台首页
 Modules.dashboard = {
   title: '工作台首页',
   render() {
@@ -12,27 +12,27 @@ Modules.dashboard = {
     const comms = DataStore.get('communication');
     const students = DataStore.get('students');
     const dutyGroups = DataStore.get('dutyGroups');
+    
+    const user = Auth.getCurrentUser();
+    const userInfo = Auth.getUsers()[user] || {};
 
-    // 计算自动轮值：按天取模
     const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-    const todayDuty = dutyGroups.length > 0 ? dutyGroups[dayOfYear % dutyGroups.length] : { name: '无', members: [] };
+    const todayDuty = dutyGroups.length > 0 ? dutyGroups[dayOfYear % dutyGroups.length] : { name: '未分配', members: [] };
 
-    // 节假日倒计时算法 (以中秋/国庆等为例)
     const holidays = [
-      { name: '中秋节/国庆节', date: '2026-10-01' },
+      { name: '中秋/国庆节', date: '2026-10-01' },
       { name: '元旦', date: '2027-01-01' }
     ];
     const today = new Date();
     const nextHoliday = holidays[0];
-    const diffDays = Math.ceil((new Date(nextHoliday.date) - today) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.max(0, Math.ceil((new Date(nextHoliday.date) - today) / (1000 * 60 * 60 * 24)));
 
     return `
-      <!-- 问候卡 & 节假日看板 -->
       <div class="grid-2">
         <div class="card" style="background: linear-gradient(135deg, #fff 0%, var(--primary-light) 100%);">
-          <h2 style="font-size:20px; margin-bottom:8px;">Hi, 班主任老师 🌸</h2>
-          <p style="color:var(--text-muted); font-size:14px;">今天也是充满活力的一天，极简办公，轻松减负！</p>
-          <div style="margin-top:16px;" class="tag pink"><i class="ri-heart-3-line"></i> 九年级(3)班 | 班级状态正常</div>
+          <h2 style="font-size:20px; margin-bottom:8px;">Hi, ${user} 老师 🌸</h2>
+          <p style="color:var(--text-muted); font-size:14px;">欢迎回到工作台，极简办公，轻松减负！</p>
+          <div style="margin-top:16px;" class="tag pink"><i class="ri-team-line"></i> ${userInfo.className || '未设定班级'} | ${userInfo.subject || '通用'}学科</div>
         </div>
 
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
@@ -44,7 +44,6 @@ Modules.dashboard = {
         </div>
       </div>
 
-      <!-- 4张快捷统计卡片 -->
       <div class="grid-4" style="margin-top:10px;">
         <div class="card" onclick="App.route('students')" style="cursor:pointer;">
           <div style="color:var(--text-muted); font-size:13px;">班级总人数</div>
@@ -55,8 +54,8 @@ Modules.dashboard = {
           <div style="font-size:24px; font-weight:700; margin-top:4px;">5 节</div>
         </div>
         <div class="card" onclick="App.route('duty')" style="cursor:pointer;">
-          <div style="color:var(--text-muted); font-size:13px;">今日值日人员</div>
-          <div style="font-size:16px; font-weight:700; margin-top:8px;" class="tag mint">${todayDuty.name}: ${todayDuty.members.join(', ')}</div>
+          <div style="color:var(--text-muted); font-size:13px;">今日值日</div>
+          <div style="font-size:15px; font-weight:700; margin-top:8px;" class="tag mint">${todayDuty.name}: ${todayDuty.members.join(', ') || '暂无'}</div>
         </div>
         <div class="card" onclick="App.route('communication')" style="cursor:pointer;">
           <div style="color:var(--text-muted); font-size:13px;">待跟进沟通</div>
@@ -64,31 +63,28 @@ Modules.dashboard = {
         </div>
       </div>
 
-      <!-- 今日列表板块 -->
       <div class="grid-2" style="margin-top:10px;">
         <div class="card">
           <h3><i class="ri-checkbox-line"></i> 待办事项</h3>
           <div style="margin-top:12px;">
-            ${todos.map(t => `
+            ${todos.length ? todos.map(t => `
               <div class="list-item">
                 <span>${t.done ? `<del style="color:#aaa">${t.title}</del>` : t.title}</span>
                 <span class="tag ${t.done ? 'mint' : 'yellow'}">${t.done ? '已完成' : '待办'}</span>
               </div>
-            `).join('')}
+            `).join('') : '<p style="color:var(--text-muted); font-size:13px;">暂无待办事项</p>'}
           </div>
         </div>
 
         <div class="card">
           <h3><i class="ri-chat-1-line"></i> 最近家校沟通</h3>
           <div style="margin-top:12px;">
-            ${comms.slice(0, 3).map(c => `
+            ${comms.length ? comms.slice(0, 3).map(c => `
               <div class="list-item">
-                <div>
-                  <strong>${c.student}</strong>: ${c.content}
-                </div>
+                <div><strong>${c.student}</strong>: ${c.content}</div>
                 <span class="tag blue">${c.date}</span>
               </div>
-            `).join('')}
+            `).join('') : '<p style="color:var(--text-muted); font-size:13px;">暂无沟通记录</p>'}
           </div>
         </div>
       </div>
@@ -96,7 +92,7 @@ Modules.dashboard = {
   }
 };
 
-// 2. 学生管理模块（含成绩曲线图）
+// 2. 学生管理（含批量 Excel / CSV 导入与模版生成）
 Modules.students = {
   title: '学生管理',
   render() {
@@ -104,58 +100,132 @@ Modules.students = {
     return `
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <h3>学生档案列表</h3>
-          <button class="capsule-btn primary" onclick="Modules.students.addStudentModal()"><i class="ri-add-line"></i> 新建学生档案</button>
+          <h3>学生档案列表 (当前共有 ${students.length} 名学生)</h3>
+          <div style="display:flex; gap:8px;">
+            <button class="capsule-btn secondary" onclick="Modules.students.downloadTemplate()"><i class="ri-download-line"></i> 下载导入模版</button>
+            <button class="capsule-btn primary" onclick="document.getElementById('studentExcelInput').click()"><i class="ri-file-excel-line"></i> 导入学生文件 (.xlsx/.csv)</button>
+            <button class="capsule-btn primary" onclick="Modules.students.addStudentModal()"><i class="ri-add-line"></i> 单个新建</button>
+          </div>
         </div>
-        <table style="width:100%; border-collapse:collapse; text-align:left;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border-light); color:var(--text-muted); font-size:13px;">
-              <th style="padding:10px;">姓名</th>
-              <th>性别</th>
-              <th>家长联系人</th>
-              <th>联系电话</th>
-              <th>综合评级/备注</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${students.map(s => `
-              <tr style="border-bottom:1px solid var(--border-light);">
-                <td style="padding:12px; font-weight:600;">${s.name}</td>
-                <td>${s.gender}</td>
-                <td>${s.parent}</td>
-                <td>${s.phone}</td>
-                <td>${s.notes}</td>
-                <td>
-                  <button class="capsule-btn secondary" onclick="Modules.students.showGrowth('${s.id}')">成长档案</button>
-                </td>
+        ${students.length === 0 ? `
+          <div style="text-align:center; padding:40px; border:2px dashed var(--border-light); border-radius:12px;">
+            <i class="ri-user-add-line" style="font-size:40px; color:var(--text-muted)"></i>
+            <p style="margin-top:8px; color:var(--text-muted);">平台当前为空。点击上方【导入学生文件】上传 Excel / CSV 批量添加学生。</p>
+          </div>
+        ` : `
+          <table style="width:100%; border-collapse:collapse; text-align:left;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border-light); color:var(--text-muted); font-size:13px;">
+                <th style="padding:10px;">姓名</th>
+                <th>性别</th>
+                <th>家长姓名</th>
+                <th>联系电话</th>
+                <th>备注/档案</th>
+                <th>操作</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${students.map(s => `
+                <tr style="border-bottom:1px solid var(--border-light);">
+                  <td style="padding:12px; font-weight:600;">${s.name}</td>
+                  <td>${s.gender || '未知'}</td>
+                  <td>${s.parent || '未填'}</td>
+                  <td>${s.phone || '未填'}</td>
+                  <td>${s.notes || '暂无说明'}</td>
+                  <td>
+                    <button class="capsule-btn secondary" onclick="Modules.students.showGrowth('${s.id}')">成长档案</button>
+                    <button class="icon-btn" onclick="Modules.students.deleteStudent('${s.id}')" style="color:#ef4444;" title="删除"><i class="ri-delete-bin-line"></i></button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `}
       </div>
     `;
   },
 
+  // 自动下载导入模版 Excel
+  downloadTemplate() {
+    const templateData = [
+      { "姓名": "张三", "性别": "男", "家长姓名": "张爸爸", "联系电话": "13800000001", "备注": "爱好篮球" },
+      { "姓名": "李四", "性别": "女", "家长姓名": "李妈妈", "联系电话": "13800000002", "备注": "学习认真" }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "学生导入模板");
+    XLSX.writeFile(wb, "学生信息导入模板.xlsx");
+  },
+
+  // 核心：使用 SheetJS 自动解析上传的 Excel / CSV 文件
+  handleExcelImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      try {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonRows = XLSX.utils.sheet_to_json(firstSheet);
+
+        if (!jsonRows || jsonRows.length === 0) {
+          App.showToast('未在文件中解析出有效数据');
+          return;
+        }
+
+        const existingStudents = DataStore.get('students');
+        let count = 0;
+
+        jsonRows.forEach((row, idx) => {
+          // 支持字段智能匹配
+          const name = row['姓名'] || row['Name'] || row['学生姓名'];
+          if (name) {
+            existingStudents.push({
+              id: 'stu_' + Date.now() + '_' + idx,
+              name: String(name).trim(),
+              gender: row['性别'] || row['Gender'] || '未知',
+              parent: row['家长姓名'] || row['家长'] || '未填',
+              phone: row['联系电话'] || row['电话'] || row['手机号'] || '未填',
+              score: 80,
+              notes: row['备注'] || '导入数据'
+            });
+            count++;
+          }
+        });
+
+        DataStore.set('students', existingStudents);
+        App.showToast(`成功自动导入 ${count} 名学生！`);
+        App.route('students');
+      } catch (err) {
+        console.error(err);
+        App.showToast('解析文件失败，请确保格式正确');
+      }
+      e.target.value = ''; // 重置 input 触发下一次
+    };
+    reader.readAsArrayBuffer(file);
+  },
+
   showGrowth(studentId) {
     const student = DataStore.get('students').find(s => s.id === studentId);
+    if (!student) return;
     const bodyHtml = `
-      <h4>${student.name} - 综合成长轨迹</h4>
-      <p style="margin-bottom:16px; color:var(--text-muted); font-size:13px;">近期多次考试成绩波动趋势：</p>
+      <h4>${student.name} - 成长轨迹</h4>
+      <p style="margin-bottom:16px; color:var(--text-muted); font-size:13px;">历史考试表现趋势：</p>
       <canvas id="growthChart" style="max-height:250px;"></canvas>
     `;
     App.showModal('学生成长档案', bodyHtml);
 
-    // 渲染 Chart.js 趋势图
     setTimeout(() => {
       const ctx = document.getElementById('growthChart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['第一次月考', '期中考试', '第二次月考', '期末模拟'],
+          labels: ['第一次月考', '期中考试', '第二次月考', '最近测试'],
           datasets: [{
-            label: '综合成绩',
-            data: [78, 82, 80, student.score],
+            label: '综合表现',
+            data: [75, 80, 85, student.score || 80],
             borderColor: '#ef8a8a',
             tension: 0.3,
             fill: false
@@ -168,7 +238,8 @@ Modules.students = {
   addStudentModal() {
     const bodyHtml = `
       <div style="display:flex; flex-direction:column; gap:12px;">
-        <input type="text" id="new_stu_name" placeholder="学生姓名" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
+        <input type="text" id="new_stu_name" placeholder="学生姓名（必填）" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
+        <input type="text" id="new_stu_gender" placeholder="性别（如：男/女）" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
         <input type="text" id="new_stu_parent" placeholder="家长姓名" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
         <input type="text" id="new_stu_phone" placeholder="联系电话" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
       </div>
@@ -177,36 +248,53 @@ Modules.students = {
   },
 
   saveStudent() {
-    const name = document.getElementById('new_stu_name').value;
-    const parent = document.getElementById('new_stu_parent').value;
-    const phone = document.getElementById('new_stu_phone').value;
-    if (!name) return;
+    const name = document.getElementById('new_stu_name').value.trim();
+    if (!name) { App.showToast('姓名不能为空'); return; }
+
+    const gender = document.getElementById('new_stu_gender').value.trim();
+    const parent = document.getElementById('new_stu_parent').value.trim();
+    const phone = document.getElementById('new_stu_phone').value.trim();
 
     const students = DataStore.get('students');
-    students.push({ id: Date.now().toString(), name, gender: '男', parent, phone, score: 80, notes: '新入学' });
+    students.push({ id: 'stu_' + Date.now(), name, gender, parent, phone, score: 80, notes: '手动添加' });
     DataStore.set('students', students);
     App.closeModal();
+    App.route('students');
+  },
+
+  deleteStudent(id) {
+    let students = DataStore.get('students');
+    students = students.filter(s => s.id !== id);
+    DataStore.set('students', students);
     App.route('students');
   }
 };
 
-// 3. 座次表模块（支持行列拖拽换座）
+// 3. 座次表
 Modules.seating = {
   title: '座次表',
   render() {
     const seating = DataStore.get('seating');
+    const students = DataStore.get('students');
+    
+    // 如果没有生成过座次数组，根据已有学生数格式化
+    if (!seating.seats || seating.seats.length === 0) {
+      seating.seats = students.map(s => s.name);
+      DataStore.set('seating', seating);
+    }
+
     return `
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3>班级座次表 (讲台方向 ↑)</h3>
           <div>
-            <button class="capsule-btn secondary" onclick="Modules.seating.autoSnake()">蛇形自动排座</button>
+            <button class="capsule-btn secondary" onclick="Modules.seating.autoSnake()">按学生列表排座</button>
           </div>
         </div>
         
         <div style="width:200px; margin:16px auto 8px auto; text-align:center; background:#cbd5e1; padding:4px; border-radius:4px; font-size:12px;">讲台</div>
 
-        <div class="seat-grid" style="grid-template-columns: repeat(${seating.cols}, 1fr);">
+        <div class="seat-grid" style="grid-template-columns: repeat(${seating.cols || 5}, 1fr);">
           ${seating.seats.map((seat, index) => `
             <div class="seat-item ${seat ? 'occupied' : ''}" draggable="true" ondragstart="Modules.seating.drag(event, ${index})" ondragover="event.preventDefault()" ondrop="Modules.seating.drop(event, ${index})">
               ${seat || '空位'}
@@ -225,7 +313,6 @@ Modules.seating = {
     ev.preventDefault();
     const sourceIndex = ev.dataTransfer.getData("text/plain");
     const seating = DataStore.get('seating');
-    // 调换位置
     const temp = seating.seats[sourceIndex];
     seating.seats[sourceIndex] = seating.seats[targetIndex];
     seating.seats[targetIndex] = temp;
@@ -237,13 +324,13 @@ Modules.seating = {
   autoSnake() {
     const students = DataStore.get('students').map(s => s.name);
     const seating = DataStore.get('seating');
-    seating.seats = seating.seats.map((_, i) => students[i] || '');
+    seating.seats = students;
     DataStore.set('seating', seating);
     App.route('seating');
   }
 };
 
-// 4. 班级相册 (IndexedDB 大图存储)
+// 4. 班级相册 (IndexedDB)
 Modules.album = {
   title: '班级相册',
   render() {
@@ -265,7 +352,7 @@ Modules.album = {
     const photoIds = DataStore.get('album_photos', []);
     const container = document.getElementById('photoContainer');
     if (photoIds.length === 0) {
-      container.innerHTML = `<p style="color:var(--text-muted)">暂无照片，请点击上传。</p>`;
+      container.innerHTML = `<p style="color:var(--text-muted)">暂无照片，请点击右上角上传。</p>`;
       return;
     }
 
@@ -294,7 +381,7 @@ Modules.album = {
     photoIds.push(photoId);
     DataStore.set('album_photos', photoIds);
     
-    App.showToast('照片已成功压缩存入 IndexedDB');
+    App.showToast('照片已成功存入 IndexedDB');
     App.route('album');
   },
 
@@ -307,7 +394,7 @@ Modules.album = {
   }
 };
 
-// 5. 成绩管理模块 (全科分析 & 图表)
+// 5. 成绩管理
 Modules.scores = {
   title: '成绩管理',
   render() {
@@ -315,64 +402,25 @@ Modules.scores = {
     return `
       <div class="card">
         <h3>全科成绩概览与分析</h3>
-        <div style="margin-top:16px; max-height:280px;">
-          <canvas id="scoresChart"></canvas>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>详细数据表</h3>
-        <table style="width:100%; border-collapse:collapse; margin-top:12px;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border-light); text-align:left;">
-              <th style="padding:8px;">姓名</th>
-              <th>语文</th>
-              <th>数学</th>
-              <th>英语</th>
-              <th>物理</th>
-              <th>历史</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${scores.map(s => `
-              <tr style="border-bottom:1px solid var(--border-light);">
-                <td style="padding:10px; font-weight:600;">${s.name}</td>
-                <td>${s.chinese}</td>
-                <td>${s.math}</td>
-                <td>${s.english}</td>
-                <td>${s.physics}</td>
-                <td>${s.history}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        ${scores.length === 0 ? '<p style="color:var(--text-muted); margin-top:12px;">暂无成绩记录。</p>' : '<div style="margin-top:16px; max-height:280px;"><canvas id="scoresChart"></canvas></div>'}
       </div>
     `;
   },
-
   initChart() {
     const scores = DataStore.get('scores');
-    const avgChinese = (scores.reduce((a,b)=>a+b.chinese,0)/scores.length).toFixed(1);
-    const avgMath = (scores.reduce((a,b)=>a+b.math,0)/scores.length).toFixed(1);
-    const avgEnglish = (scores.reduce((a,b)=>a+b.english,0)/scores.length).toFixed(1);
-
+    if (!scores.length) return;
     const ctx = document.getElementById('scoresChart').getContext('2d');
     new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['语文人均分', '数学人均分', '英语人均分'],
-        datasets: [{
-          label: '班级均分',
-          data: [avgChinese, avgMath, avgEnglish],
-          backgroundColor: ['#ef8a8a', '#a8e6cf', '#ffd3b6']
-        }]
+        labels: ['平均分'],
+        datasets: [{ label: '成绩', data: [85], backgroundColor: ['#ef8a8a'] }]
       },
       options: { responsive: true, maintainAspectRatio: false }
     });
   }
 };
 
-// 通用占位渲染模块（用于课程表、日志、工具箱等）
 const createGenericModule = (title, icon, text) => ({
   title,
   render() {
