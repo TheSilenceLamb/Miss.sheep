@@ -7,12 +7,10 @@ const App = {
   async init() {
     await PhotoStore.init();
 
-    // 绑定当前时间
     document.getElementById('currentDateBadge').innerText = new Date().toLocaleDateString('zh-CN', {
       year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     });
 
-    // 检查登录状态并渲染对应视图
     this.checkAuthAndRender();
   },
 
@@ -23,30 +21,25 @@ const App = {
     const onboardingOverlay = document.getElementById('onboardingOverlay');
 
     if (!currentUser) {
-      // 未登录
       authContainer.style.display = 'flex';
       appMain.style.display = 'none';
       onboardingOverlay.classList.remove('active');
     } else {
-      // 已登录
       authContainer.style.display = 'none';
       appMain.style.display = 'flex';
 
       const users = Auth.getUsers();
       const userInfo = users[currentUser] || {};
 
-      // 检查新用户是否完成了初始化设置
       if (!userInfo.isOnboarded) {
         onboardingOverlay.classList.add('active');
       } else {
         onboardingOverlay.classList.remove('active');
         
-        // 更新顶栏与侧边栏用户相关界面
         document.getElementById('userDisplayName').innerText = `${currentUser} 老师`;
         document.getElementById('userClassBadge').innerText = userInfo.className || '未设定班级';
         document.getElementById('headerClassBadge').innerHTML = `<i class="ri-team-line"></i> ${userInfo.className || '未设定班级'}`;
         
-        // 渲染主模块
         this.route(this.currentRoute);
       }
     }
@@ -57,16 +50,13 @@ const App = {
 
     this.currentRoute = routeName;
 
-    // 更新侧边栏高亮状态
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     const activeNav = document.getElementById(`nav-${routeName}`);
     if (activeNav) activeNav.classList.add('active');
 
-    // 渲染视图
     const contentEl = document.getElementById('pageContent');
     contentEl.innerHTML = Modules[routeName].render();
 
-    // 模块生命周期钩子
     if (routeName === 'album') {
       Modules.album.loadPhotos();
     } else if (routeName === 'scores') {
