@@ -4,16 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>初中班主任减负工作台</title>
-  <!-- Chart.js CDN 用于数据图表 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Remixicon CDN 用于图标 -->
   <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-  <!-- SheetJS 用于浏览器端直接解析 Excel/CSV 文件 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- 登录 / 注册 独立界面（使用原工作台统一UI视觉） -->
+  <!-- 登录 / 注册 独立界面 -->
   <div id="authContainer" class="auth-container" style="display: none;">
     <div class="auth-card">
       <div class="auth-header">
@@ -39,7 +36,7 @@
     </div>
   </div>
 
-  <!-- 新用户首次初始化设置弹窗/遮罩 -->
+  <!-- 新用户初始化弹窗 -->
   <div id="onboardingOverlay" class="modal-overlay" style="z-index: 200;">
     <div class="modal-card" style="max-width: 440px;">
       <div class="modal-header">
@@ -66,7 +63,6 @@
 
   <!-- 主工作台容器 -->
   <div class="app-container" id="appMain" style="display: none;">
-    <!-- 左侧导航栏 -->
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-icon"><i class="ri-heart-pulse-fill"></i></div>
@@ -89,7 +85,6 @@
         <a class="nav-item" onclick="App.route('album')" id="nav-album"><i class="ri-image-2-line"></i> 班级相册</a>
         <a class="nav-item" onclick="App.route('tools')" id="nav-tools"><i class="ri-briefcase-line"></i> 减负工具箱</a>
       </nav>
-      <!-- 底部用户信息与退出登录按钮 -->
       <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
         <div>
           <div id="userDisplayName" style="font-weight: 600; font-size: 14px; color: var(--text-dark);">老师</div>
@@ -99,9 +94,7 @@
       </div>
     </aside>
 
-    <!-- 主主体布局 -->
     <main class="main-content">
-      <!-- 顶栏 -->
       <header class="topbar">
         <div class="quick-input-container">
           <i class="ri-magic-line magic-icon"></i>
@@ -114,14 +107,10 @@
         </div>
       </header>
 
-      <!-- 动态路由渲染区域 -->
-      <section id="pageContent" class="page-content">
-        <!-- 模块内容由 JavaScript 渲染 -->
-      </section>
+      <section id="pageContent" class="page-content"></section>
     </main>
   </div>
 
-  <!-- 全局 Modal 模态框容器 -->
   <div class="modal-overlay" id="globalModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -133,10 +122,10 @@
     </div>
   </div>
 
-  <!-- 隐藏的文件上传控件（用于解析 Excel / CSV 导入学生） -->
+  <!-- 隐藏的文件上传控件 -->
   <input type="file" id="studentExcelInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="Modules.students.handleExcelImport(event)">
+  <input type="file" id="scheduleExcelInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="Modules.schedule.handleExcelImport(event)">
 
-  <!-- 脚本引用 -->
   <script src="js/data.js"></script>
   <script src="js/modules.js"></script>
   <script src="js/app.js"></script>
