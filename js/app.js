@@ -1,95 +1,166 @@
 /**
- * App 极简路由控制与初始化入口
+ * 应用主逻辑及路由管理
  */
 const App = {
-  currentRoute: 'dashboard',
+  init: function() {
+    Auth.checkAuth();
+  },
 
-  async init() {
-    await PhotoStore.init();
-
-    document.getElementById('currentDateBadge').innerText = new Date().toLocaleDateString('zh-CN', {
-      year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+  route: function(pageId) {
+    // 1. 高亮切换导航，严格保留手写 <i> 图标节点，只切换 active 类
+    document.querySelectorAll('.nav-menu .nav-item').forEach(item => {
+      item.classList.remove('active');
     });
+    
+    const activeNav = document.getElementById(`nav-${pageId}`);
+    if (activeNav) {
+      activeNav.classList.add('active');
+    }
 
-    this.checkAuthAndRender();
-  },
-
-  checkAuthAndRender() {
-    const currentUser = Auth.getCurrentUser();
-    const authContainer = document.getElementById('authContainer');
-    const appMain = document.getElementById('appMain');
-    const onboardingOverlay = document.getElementById('onboardingOverlay');
-
-    if (!currentUser) {
-      authContainer.style.display = 'flex';
-      appMain.style.display = 'none';
-      onboardingOverlay.classList.remove('active');
+    // 2. 路由分发
+    if (Modules[pageId] && typeof Modules[pageId].render === 'function') {
+      Modules[pageId].render();
     } else {
-      authContainer.style.display = 'none';
-      appMain.style.display = 'flex';
-
-      const users = Auth.getUsers();
-      const userInfo = users[currentUser] || {};
-
-      if (!userInfo.isOnboarded) {
-        onboardingOverlay.classList.add('active');
-      } else {
-        onboardingOverlay.classList.remove('active');
-        
-        document.getElementById('userDisplayName').innerText = `${currentUser} 老师`;
-        document.getElementById('userClassBadge').innerText = userInfo.className || '未设定班级';
-        document.getElementById('headerClassBadge').innerHTML = `<i class="ri-team-line"></i> ${userInfo.className || '未设定班级'}`;
-        
-        this.route(this.currentRoute);
-      }
+      Modules.createGenericModule(pageId);
     }
   },
 
-  route(routeName) {
-    if (!Modules[routeName]) return;
-
-    this.currentRoute = routeName;
-
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    const activeNav = document.getElementById(`nav-${routeName}`);
-    if (activeNav) activeNav.classList.add('active');
-
-    const contentEl = document.getElementById('pageContent');
-    contentEl.innerHTML = Modules[routeName].render();
-
-    if (routeName === 'album') {
-      Modules.album.loadPhotos();
-    } else if (routeName === 'scores') {
-      Modules.scores.initChart();
-    }
-  },
-
-  showModal(title, bodyHtml, footerHtml = '') {
+  showModal: function(title, contentHtml, buttonsHtml = []) {
     document.getElementById('modalTitle').innerText = title;
-    document.getElementById('modalBody').innerHTML = bodyHtml;
-    document.getElementById('modalFooter').innerHTML = footerHtml;
+    document.getElementById('modalBody').innerHTML = contentHtml;
+    
+    const footer = document.getElementById('modalFooter');
+    if (Array.isArray(buttonsHtml) && buttonsHtml.length > 0) {
+      footer.innerHTML = buttonsHtml.map(btn => 
+        `<button class="${btn.class || 'capsule-btn'}" onclick="${btn.onclick}">${btn.text}</button>`
+      ).join('');
+    } else {
+      footer.innerHTML = `<button class="capsule-btn primary" onclick="App.closeModal()">确定</button>`;
+    }
+
     document.getElementById('globalModal').classList.add('active');
   },
 
-  closeModal() {
+  closeModal: function() {
     document.getElementById('globalModal').classList.remove('active');
-  },
-
-  showToast(msg) {
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-      position: fixed; bottom: 32px; right: 32px;
-      background: rgba(0, 0, 0, 0.8); color: #fff;
-      padding: 10px 20px; border-radius: 50px; font-size: 14px;
-      z-index: 1000; backdrop-filter: blur(4px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    `;
-    toast.innerText = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2500);
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => {
+/**
+ * 账号与认证模块
+ */
+const Auth = {
+  checkAuth: function() {
+    const currentUser = DataManager.get('currentUser');
+    if (currentUser) {
+      document.getElementById('authContainer').style.display = 'none';
+      document.getElementById('appMain').style.display = 'flex';
+      
+      document.getElementById('userDisplayName').innerText = currentUser.username + ' 老师';
+      if (currentUser.className) {
+        document.getElementById('userClassBadge').innerText = currentUser.className;
+        document.getElementById('headerClassBadge').innerHTML = `<i class="ri-team-line"></i> ${currentUser.className}`;
+      }
+      
+      if (!currentUser.initialized) {
+        document.getElementById('onboardingOverlay').classList.add('active');
+      } else {
+        document.getElementById('onboardingOverlay').classList.remove('active');
+        App.route('dashboard');
+      }
+    } else {
+      document.getElementById('authContainer').style.display = 'flex';
+      document.getElementById('appMain').style.display = 'none';
+    }
+  },
+
+  switchTab: function(tab) {
+    document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
+    if (tab === 'login') {
+      document.getElementById('tabLogin').classList.add('active');
+      document.getElementById('authSubmitBtn').innerText = '登录系统';
+    } else {
+      document.getElementById('tabRegister').classList.add('active');
+      document.getElementById('authSubmitBtn').innerText = '创建账号';
+    }
+  },
+
+  handleSubmit: function(e) {
+    e.preventDefault();
+    const username = document.getElementById('authUsername').value.trim();
+    if (!username) return;
+
+    const isRegister = document.getElementById('tabRegister').classList.contains('active');
+    let user = {
+      username: username,
+      initialized: false,
+      className: ''
+    };
+
+    if (isRegister) {
+      user.initialized = false;
+    } else {
+      user.initialized = true;
+      user.className = '九年级(3)班';
+    }
+
+    DataManager.set('currentUser', user);
+    Auth.checkAuth();
+  },
+
+  completeOnboarding: function() {
+    const className = document.getElementById('initClassName').value || '九年级(3)班';
+    let currentUser = DataManager.get('currentUser');
+    if (currentUser) {
+      currentUser.className = className;
+      currentUser.initialized = true;
+      DataManager.set('currentUser', currentUser);
+    }
+    document.getElementById('onboardingOverlay').classList.remove('active');
+    Auth.checkAuth();
+  },
+
+  logout: function() {
+    DataManager.remove('currentUser');
+    Auth.checkAuth();
+  }
+};
+
+/**
+ * 顶部快速一句话速记识别分发
+ */
+const QuickNote = {
+  processInput: function() {
+    const input = document.getElementById('globalQuickInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // 创建一条新待办
+    const todos = DataManager.get('todos') || [];
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    todos.unshift({
+      id: Date.now(),
+      title: text,
+      createdAt: dateStr,
+      completed: false
+    });
+    
+    DataManager.set('todos', todos);
+    input.value = '';
+
+    App.showModal('识别成功', `<p style="font-size:14px; color:var(--text-dark);">已自动为你生成一条新的待办事项：<br><strong>"${text}"</strong></p>`);
+
+    const activeNav = document.querySelector('.nav-item.active');
+    if (activeNav && activeNav.id === 'nav-dashboard') {
+      Modules.dashboard.render();
+    } else if (activeNav && activeNav.id === 'nav-todo') {
+      Modules.todo.render();
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
   App.init();
 });
