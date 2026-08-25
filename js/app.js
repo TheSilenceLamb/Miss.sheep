@@ -1,158 +1,95 @@
 /**
- * js/app.js - 主应用控制器及辅助函数
+ * App 极简路由控制与初始化入口
  */
-window.App = {
+const App = {
   currentRoute: 'dashboard',
 
-  init: function() {
-    try {
-      // 初始化 PhotoStore
-      PhotoStore.init().catch(e => console.warn('PhotoStore 初始化失败:', e));
-      
-      // 检查用户登录状态
-      if (Auth.getCurrentUser()) {
-        App.checkAuthAndRender();
-      } else {
-        App.showAuthUI();
-      }
-    } catch (e) {
-      console.error('应用初始化失败:', e);
-      App.showAuthUI();
-    }
-  },
+  async init() {
+    await PhotoStore.init();
 
-  showAuthUI: function() {
-    const authContainer = document.getElementById('authContainer');
-    const appMain = document.getElementById('appMain');
-    if (authContainer) authContainer.style.display = 'flex';
-    if (appMain) appMain.style.display = 'none';
-  },
-
-  checkAuthAndRender: function() {
-    const currentUser = Auth.getCurrentUser();
-    if (!currentUser) {
-      App.showAuthUI();
-      return;
-    }
-
-    const authContainer = document.getElementById('authContainer');
-    const appMain = document.getElementById('appMain');
-    
-    if (authContainer) authContainer.style.display = 'none';
-    if (appMain) appMain.style.display = 'flex';
-
-    // 更新用户界面信息
-    App.updateUserDisplay();
-    
-    // 检查是否需要初始化
-    const users = Auth.getUsers();
-    if (users[currentUser] && !users[currentUser].isOnboarded) {
-      const overlay = document.getElementById('onboardingOverlay');
-      if (overlay) overlay.classList.add('active');
-    } else {
-      const overlay = document.getElementById('onboardingOverlay');
-      if (overlay) overlay.classList.remove('active');
-    }
-
-    // 导航到首页
-    App.route('dashboard');
-  },
-
-  updateUserDisplay: function() {
-    const currentUser = Auth.getCurrentUser();
-    const users = Auth.getUsers();
-    const userData = users[currentUser] || {};
-    
-    const userDisplay = document.getElementById('userDisplayName');
-    const userBadge = document.getElementById('userClassBadge');
-    const headerBadge = document.getElementById('headerClassBadge');
-
-    if (userDisplay) userDisplay.innerText = currentUser;
-    if (userBadge) userBadge.innerText = userData.className || '班级未设定';
-    if (headerBadge) headerBadge.innerHTML = `<i class="ri-team-line"></i> ${userData.className || '班级未设定'}`;
-  },
-
-  updateDateDisplay: function() {
-    const now = new Date();
-    const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-    const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${weekDays[now.getDay()]}`;
-    const badge = document.getElementById('currentDateBadge');
-    if (badge) badge.innerText = dateStr;
-  },
-
-  route: function(pageId) {
-    App.currentRoute = pageId;
-    
-    // 1. 高亮切换导航
-    document.querySelectorAll('.nav-menu .nav-item').forEach(item => {
-      item.classList.remove('active');
+    document.getElementById('currentDateBadge').innerText = new Date().toLocaleDateString('zh-CN', {
+      year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
     });
-    
-    const activeNav = document.getElementById(`nav-${pageId}`);
-    if (activeNav) {
-      activeNav.classList.add('active');
-    }
 
-    // 2. 路由分发
-    if (typeof Modules !== 'undefined' && Modules[pageId] && typeof Modules[pageId].render === 'function') {
-      Modules[pageId].render();
-    } else if (typeof Modules !== 'undefined' && typeof Modules.createGenericModule === 'function') {
-      Modules.createGenericModule(pageId);
-    }
+    this.checkAuthAndRender();
   },
 
-  showModal: function(title, contentHtml, buttonsHtml = []) {
-    const titleEl = document.getElementById('modalTitle');
-    const bodyEl = document.getElementById('modalBody');
-    const footer = document.getElementById('modalFooter');
-    
-    if (titleEl) titleEl.innerText = title;
-    if (bodyEl) bodyEl.innerHTML = contentHtml;
-    
-    if (footer) {
-      if (Array.isArray(buttonsHtml) && buttonsHtml.length > 0) {
-        footer.innerHTML = buttonsHtml.map(btn => 
-          `<button class="${btn.class || 'capsule-btn'}" onclick="${btn.onclick}">${btn.text}</button>`
-        ).join('');
+  checkAuthAndRender() {
+    const currentUser = Auth.getCurrentUser();
+    const authContainer = document.getElementById('authContainer');
+    const appMain = document.getElementById('appMain');
+    const onboardingOverlay = document.getElementById('onboardingOverlay');
+
+    if (!currentUser) {
+      authContainer.style.display = 'flex';
+      appMain.style.display = 'none';
+      onboardingOverlay.classList.remove('active');
+    } else {
+      authContainer.style.display = 'none';
+      appMain.style.display = 'flex';
+
+      const users = Auth.getUsers();
+      const userInfo = users[currentUser] || {};
+
+      if (!userInfo.isOnboarded) {
+        onboardingOverlay.classList.add('active');
       } else {
-        footer.innerHTML = `<button class="capsule-btn primary" onclick="App.closeModal()">确定</button>`;
+        onboardingOverlay.classList.remove('active');
+        
+        document.getElementById('userDisplayName').innerText = `${currentUser} 老师`;
+        document.getElementById('userClassBadge').innerText = userInfo.className || '未设定班级';
+        document.getElementById('headerClassBadge').innerHTML = `<i class="ri-team-line"></i> ${userInfo.className || '未设定班级'}`;
+        
+        this.route(this.currentRoute);
       }
     }
-
-    const modal = document.getElementById('globalModal');
-    if (modal) modal.classList.add('active');
   },
 
-  closeModal: function() {
-    const modal = document.getElementById('globalModal');
-    if (modal) modal.classList.remove('active');
+  route(routeName) {
+    if (!Modules[routeName]) return;
+
+    this.currentRoute = routeName;
+
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const activeNav = document.getElementById(`nav-${routeName}`);
+    if (activeNav) activeNav.classList.add('active');
+
+    const contentEl = document.getElementById('pageContent');
+    contentEl.innerHTML = Modules[routeName].render();
+
+    if (routeName === 'album') {
+      Modules.album.loadPhotos();
+    } else if (routeName === 'scores') {
+      Modules.scores.initChart();
+    }
   },
 
-  showToast: function(message) {
-    // 简单的 toast 实现
+  showModal(title, bodyHtml, footerHtml = '') {
+    document.getElementById('modalTitle').innerText = title;
+    document.getElementById('modalBody').innerHTML = bodyHtml;
+    document.getElementById('modalFooter').innerHTML = footerHtml;
+    document.getElementById('globalModal').classList.add('active');
+  },
+
+  closeModal() {
+    document.getElementById('globalModal').classList.remove('active');
+  },
+
+  showToast(msg) {
     const toast = document.createElement('div');
     toast.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: var(--text-dark);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 50px;
-      font-size: 13px;
-      z-index: 1000;
-      animation: slideIn 0.3s ease;
+      position: fixed; bottom: 32px; right: 32px;
+      background: rgba(0, 0, 0, 0.8); color: #fff;
+      padding: 10px 20px; border-radius: 50px; font-size: 14px;
+      z-index: 1000; backdrop-filter: blur(4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     `;
-    toast.innerText = message;
+    toast.innerText = msg;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    setTimeout(() => toast.remove(), 2500);
   }
 };
 
-// 初始化事件监听
-document.addEventListener('DOMContentLoaded', () => {
-  App.updateDateDisplay();
-  // 每分钟更新一次日期显示
-  setInterval(() => App.updateDateDisplay(), 60000);
+window.addEventListener('DOMContentLoaded', () => {
   App.init();
 });
