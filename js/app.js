@@ -35,7 +35,7 @@ const App = {
       const users = Auth.getUsers();
       const userInfo = users[currentUser] || {};
 
-      // 检查新用户是否完成了简单初始化设置
+      // 检查新用户是否完成了初始化设置
       if (!userInfo.isOnboarded) {
         onboardingOverlay.classList.add('active');
       } else {
@@ -60,7 +60,7 @@ const App = {
     // 更新侧边栏高亮状态
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     const activeNav = document.getElementById(`nav-${routeName}`);
-    if (activeNav) activeNav.classList.active;
+    if (activeNav) activeNav.classList.add('active');
 
     // 渲染视图
     const contentEl = document.getElementById('pageContent');
